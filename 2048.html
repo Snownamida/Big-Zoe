@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2048 崔梓璇版</title>
+    <style>
+        /* ==================== 
+           基础样式 (沿用原版风格)
+           ==================== */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
+            /* 禁止浏览器默认触摸行为 */
+        }
+        
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #ffe4e1;
+            font-family: 'Arial', sans-serif;
+            background-image: radial-gradient(circle at 50% 30%, #fff0f5 0%, #ffe4e1 80%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #game-container {
+            width: 100%;
+            max-width: 500px;
+            /* 移动端适配最大宽度 */
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        /* ==================== 
+           头部 UI
+           ==================== */
+        
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #d63384;
+            text-shadow: 2px 2px 0px rgba(255, 255, 255, 0.5);
+        }
+        
+        .score-container {
+            background: rgba(255, 255, 255, 0.6);
+            padding: 5px 15px;
+            border-radius: 15px;
+            color: #d63384;
+            font-weight: bold;
+            font-size: 18px;
+            border: 2px solid #fff;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        .score-label {
+            font-size: 12px;
+            opacity: 0.8;
+            display: block;
+        }
+        
+        .restart-btn {
+            background: #d63384;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(214, 51, 132, 0.3);
+        }
+        
+        .restart-btn:active {
+            transform: scale(0.95);
+        }
+        /* ==================== 
+           游戏网格区域
+           ==================== */
+        
+        #grid-container {
+            position: relative;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 10px;
+            padding: 10px;
+            width: 100%;
+            /* 保持正方形 */
+            aspect-ratio: 1 / 1;
+            border: 4px solid rgba(255, 255, 255, 0.6);
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+        }
+        /* 背景空网格 */
+        
+        .grid-cell {
+            background: rgba(214, 51, 132, 0.1);
+            border-radius: 8px;
+            width: 100%;
+            height: 100%;
+        }
+        /* 实际滑块 (绝对定位以支持动画) */
+        
+        .tile {
+            position: absolute;
+            width: calc(25% - 12.5px);
+            /* (100% - 3*gap - 2*padding) / 4 */
+            height: calc(25% - 12.5px);
+            border-radius: 50%;
+            /* 圆形头像 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            transition: transform 0.15s ease-in-out, opacity 0.1s;
+            z-index: 10;
+            box-sizing: border-box;
+            border: 3px solid transparent;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        /* 滑块内的图片 */
+        
+        .tile img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            display: block;
+        }
+        /* 如果图片加载失败显示的文字 */
+        
+        .tile span {
+            position: absolute;
+            color: white;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+            z-index: 2;
+        }
+        /* 合并动画 */
+        
+        .tile-merged {
+            animation: pop 0.2s ease-in-out;
+            z-index: 20;
+        }
+        /* 新生成动画 */
+        
+        .tile-new {
+            animation: appear 0.2s ease-in-out;
+        }
+        
+        @keyframes pop {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        
+        @keyframes appear {
+            0% {
+                opacity: 0;
+                transform: scale(0);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        /* ==================== 
+           游戏结束/胜利遮罩
+           ==================== */
+        
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 240, 245, 0.85);
+            backdrop-filter: blur(5px);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            border-radius: 10px;
+        }
+        
+        #overlay h2 {
+            font-size: 40px;
+            color: #d63384;
+            margin-bottom: 20px;
+        }
+        
+        #final-score {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <div class="header-bar">
+            <div>
+                <div class="title">2048 崔梓璇</div>
+            </div>
+            <div class="score-container">
+                <span class="score-label">得分</span>
+                <span id="score">0</span>
+            </div>
+            <button class="restart-btn" onclick="game.restart()">重置</button>
+        </div>
+
+        <div id="grid-container">
+            <!-- 16个背景格子 -->
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+
+            <!-- 动态生成的方块将放在这里 -->
+            <div id="tile-container"></div>
+
+            <!-- 遮罩层 -->
+            <div id="overlay">
+                <h2 id="overlay-msg">游戏结束</h2>
+                <div id="final-score">得分: 0</div>
+                <button class="restart-btn" onclick="game.restart()">再来一次</button>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px; color: #d63384; font-size: 14px; opacity: 0.8;">
+            滑动屏幕来合并崔梓璇！
+        </div>
+    </div>
+
+    <script>
+        // ===========================
+        // 配置与素材 (与上一版代码保持一致)
+        // ===========================
+        const IMG_PATH = 'images/';
+
+        // 对应 2, 4, 8 ... 2048 的配置
+        const FRUIT_LEVELS = [{
+            id: 0,
+            val: 2,
+            fileName: '崔梓璇01.gif',
+            backgroundColor: '#FFFACD',
+            borderColor: '#FFD700'
+        }, {
+            id: 1,
+            val: 4,
+            fileName: '崔梓璇02.gif',
+            backgroundColor: '#FFA07A',
+            borderColor: '#FF4500'
+        }, {
+            id: 2,
+            val: 8,
+            fileName: '崔梓璇03.gif',
+            backgroundColor: '#FF6347',
+            borderColor: '#DC143C'
+        }, {
+            id: 3,
+            val: 16,
+            fileName: '崔梓璇04.gif',
+            backgroundColor: '#90EE90',
+            borderColor: '#3CB371'
+        }, {
+            id: 4,
+            val: 32,
+            fileName: '崔梓璇05.gif',
+            backgroundColor: '#32CD32',
+            borderColor: '#228B22'
+        }, {
+            id: 5,
+            val: 64,
+            fileName: '崔梓璇06.gif',
+            backgroundColor: '#87CEFA',
+            borderColor: '#4682B4'
+        }, {
+            id: 6,
+            val: 128,
+            fileName: '崔梓璇07.gif',
+            backgroundColor: '#4169E1',
+            borderColor: '#191970'
+        }, {
+            id: 7,
+            val: 256,
+            fileName: '崔梓璇08.gif',
+            backgroundColor: '#9932CC',
+            borderColor: '#800080'
+        }, {
+            id: 8,
+            val: 512,
+            fileName: '崔梓璇09.gif',
+            backgroundColor: '#FFD700',
+            borderColor: '#B8860B'
+        }, {
+            id: 9,
+            val: 1024,
+            fileName: '崔梓璇10.gif',
+            backgroundColor: '#C0C0C0',
+            borderColor: '#808080'
+        }, {
+            id: 10,
+            val: 2048,
+            fileName: '崔梓璇11.png',
+            backgroundColor: '#228B22',
+            borderColor: '#3CB371'
+        }];
+
+        // ===========================
+        // 游戏逻辑类
+        // ===========================
+        class Game2048 {
+            constructor() {
+                this.gridSize = 4;
+                this.grid = []; // 存储数字等级 (0-10)，null 表示空
+                this.score = 0;
+                this.isGameOver = false;
+
+                this.tileContainer = document.getElementById('tile-container');
+                this.scoreEl = document.getElementById('score');
+                this.overlay = document.getElementById('overlay');
+                this.overlayMsg = document.getElementById('overlay-msg');
+                this.finalScoreEl = document.getElementById('final-score');
+
+                // 触摸变量
+                this.touchStartX = 0;
+                this.touchStartY = 0;
+
+                this.init();
+            }
+
+            init() {
+                this.setupInput();
+                this.restart();
+            }
+
+            restart() {
+                this.grid = Array(this.gridSize).fill(null).map(() => Array(this.gridSize).fill(null));
+                this.score = 0;
+                this.isGameOver = false;
+                this.updateScore(0);
+                this.overlay.style.display = 'none';
+
+                this.addRandomTile();
+                this.addRandomTile();
+                this.render();
+            }
+
+            // 添加随机块 (生成 Level 0 或 Level 1)
+            addRandomTile() {
+                const emptyCells = [];
+                for (let r = 0; r < this.gridSize; r++) {
+                    for (let c = 0; c < this.gridSize; c++) {
+                        if (this.grid[r][c] === null) {
+                            emptyCells.push({
+                                r,
+                                c
+                            });
+                        }
+                    }
+                }
+
+                if (emptyCells.length > 0) {
+                    const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                    // 90% 概率生成 Level 0 (2), 10% 概率生成 Level 1 (4)
+                    this.grid[randomCell.r][randomCell.c] = {
+                        level: Math.random() < 0.9 ? 0 : 1,
+                        id: Math.random().toString(36).substr(2, 9), // 唯一ID用于DOM Diff
+                        isNew: true,
+                        isMerged: false
+                    };
+                }
+            }
+
+            // 更新分数
+            updateScore(add) {
+                this.score += add;
+                this.scoreEl.innerText = this.score;
+            }
+
+            // ===========================
+            // 核心移动逻辑
+            // ===========================
+            move(direction) {
+                if (this.isGameOver) return;
+
+                let moved = false;
+                let scoreAdded = 0;
+
+                // 预处理：重置合并状态
+                this.resetMergeStatus();
+
+                // 旋转矩阵以便统一处理（全部视为向左移，然后旋转回去）
+                // 0: Left, 1: Up, 2: Right, 3: Down
+                // 为了简化，分别写逻辑吧，旋转太绕
+
+                const traverse = (callback) => {
+                    if (direction === 'left') {
+                        for (let r = 0; r < 4; r++) {
+                            for (let c = 0; c < 4; c++) callback(r, c);
+                        }
+                    } else if (direction === 'right') {
+                        for (let r = 0; r < 4; r++) {
+                            for (let c = 3; c >= 0; c--) callback(r, c);
+                        }
+                    } else if (direction === 'up') {
+                        for (let c = 0; c < 4; c++) {
+                            for (let r = 0; r < 4; r++) callback(r, c);
+                        }
+                    } else if (direction === 'down') {
+                        for (let c = 0; c < 4; c++) {
+                            for (let r = 3; r >= 0; r--) callback(r, c);
+                        }
+                    }
+                };
+
+                // 获取下一个位置的向量
+                const vector = {
+                    left: {
+                        x: -1,
+                        y: 0
+                    },
+                    right: {
+                        x: 1,
+                        y: 0
+                    },
+                    up: {
+                        x: 0,
+                        y: -1
+                    },
+                    down: {
+                        x: 0,
+                        y: 1
+                    }
+                }[direction];
+
+                traverse((r, c) => {
+                    const tile = this.grid[r][c];
+                    if (tile) {
+                        let nextR = r;
+                        let nextC = c;
+
+                        // 寻找最远的空位
+                        while (true) {
+                            const checkR = nextR + vector.y;
+                            const checkC = nextC + vector.x;
+
+                            // 越界检查
+                            if (checkR < 0 || checkR >= 4 || checkC < 0 || checkC >= 4) break;
+
+                            const nextTile = this.grid[checkR][checkC];
+
+                            if (nextTile === null) {
+                                // 空位，继续前进
+                                nextR = checkR;
+                                nextC = checkC;
+                            } else if (nextTile.level === tile.level && !nextTile.isMerged) {
+                                // 可以合并
+                                nextR = checkR;
+                                nextC = checkC;
+                                break; // 找到合并目标，停止
+                            } else {
+                                // 遇到障碍且不可合并
+                                break;
+                            }
+                        }
+
+                        // 如果位置变了
+                        if (nextR !== r || nextC !== c) {
+                            const targetTile = this.grid[nextR][nextC];
+
+                            if (targetTile === null) {
+                                // 移动到空位
+                                this.grid[nextR][nextC] = tile;
+                                this.grid[r][c] = null;
+                                moved = true;
+                            } else if (targetTile.level === tile.level && !targetTile.isMerged) {
+                                // 合并
+                                const newLevel = tile.level + 1;
+                                this.grid[nextR][nextC] = {
+                                    level: newLevel,
+                                    id: targetTile.id, // 保持ID以尽量平滑（或者生成新ID）
+                                    isMerged: true,
+                                    isNew: false
+                                };
+                                this.grid[r][c] = null;
+
+                                // 得分: 新等级对应的分数
+                                if (newLevel < FRUIT_LEVELS.length) {
+                                    scoreAdded += FRUIT_LEVELS[newLevel].val;
+                                } else {
+                                    scoreAdded += Math.pow(2, newLevel + 1);
+                                }
+                                moved = true;
+                            }
+                        }
+                    }
+                });
+
+                if (moved) {
+                    this.updateScore(scoreAdded);
+                    this.addRandomTile();
+                    this.render();
+
+                    if (this.checkGameOver()) {
+                        this.gameOver();
+                    }
+                }
+            }
+
+            resetMergeStatus() {
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 0; c < 4; c++) {
+                        if (this.grid[r][c]) {
+                            this.grid[r][c].isMerged = false;
+                            this.grid[r][c].isNew = false;
+                        }
+                    }
+                }
+            }
+
+            checkGameOver() {
+                // 1. 还有空格吗？
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 0; c < 4; c++) {
+                        if (this.grid[r][c] === null) return false;
+                    }
+                }
+
+                // 2. 还能合并吗？
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 0; c < 4; c++) {
+                        const current = this.grid[r][c].level;
+                        // 查右边
+                        if (c < 3 && this.grid[r][c + 1].level === current) return false;
+                        // 查下边
+                        if (r < 3 && this.grid[r + 1][c].level === current) return false;
+                    }
+                }
+
+                return true;
+            }
+
+            gameOver() {
+                this.isGameOver = true;
+                this.overlayMsg.innerText = "游戏结束";
+                this.finalScoreEl.innerText = "最终得分: " + this.score;
+                this.overlay.style.display = 'flex';
+            }
+
+            // ===========================
+            // 渲染视图
+            // ===========================
+            render() {
+                // 清空旧元素 (简单的全量刷新，为了性能可以用VirtualDOM，但此处DOM简单)
+                this.tileContainer.innerHTML = '';
+
+                // 计算每个格子的宽度和间距，用于绝对定位
+                // grid gap: 10px, padding: 10px
+                // 假设容器是 100%，我们使用 CSS 百分比定位
+
+                for (let r = 0; r < this.gridSize; r++) {
+                    for (let c = 0; c < this.gridSize; c++) {
+                        const tileData = this.grid[r][c];
+                        if (tileData) {
+                            const el = document.createElement('div');
+                            el.className = 'tile';
+
+                            // 限制最大等级，防止数组越界
+                            const displayLevel = Math.min(tileData.level, FRUIT_LEVELS.length - 1);
+                            const config = FRUIT_LEVELS[displayLevel];
+
+                            // 样式
+                            el.style.backgroundColor = config.backgroundColor;
+                            el.style.borderColor = config.borderColor;
+
+                            // 位置计算 (10px gap)
+                            // left = (gap + width) * c + gap
+                            // 但是这里用 CSS 百分比更方便
+                            // grid-gap: 10px, container padding: 10px.
+                            // 实际在 CSS 里我们用 grid 布局画了背景，但滑块用 absolute。
+                            // 简单起见，我们直接计算百分比位置：
+                            // 4个块 + 5个间隙。
+                            // 为了简化，我们假设 CSS grid 已经定好位置，我们也可以动态将 tile 放入 grid cell？
+                            // 不行，动画需要 absolute。
+                            // 重新计算：
+                            // 每一个格子占据 25%。
+                            // Top/Left = r * 25% , c * 25%
+                            // 加上一些 padding 微调
+                            el.style.top = `calc(${r * 25}% + 10px)`;
+                            el.style.left = `calc(${c * 25}% + 10px)`;
+                            // 大小在 CSS 里已经减去了 gap
+
+                            // 动画类
+                            if (tileData.isNew) el.classList.add('tile-new');
+                            if (tileData.isMerged) el.classList.add('tile-merged');
+
+                            // 内容：图片
+                            const img = document.createElement('img');
+                            img.src = IMG_PATH + config.fileName;
+                            img.onerror = function() {
+                                // 图片加载失败显示数字
+                                el.innerText = config.val;
+                            };
+                            el.appendChild(img);
+
+                            this.tileContainer.appendChild(el);
+                        }
+                    }
+                }
+            }
+
+            // ===========================
+            // 输入处理
+            // ===========================
+            setupInput() {
+                // 键盘 (桌面调试用)
+                document.addEventListener('keydown', (e) => {
+                    switch (e.key) {
+                        case 'ArrowLeft':
+                            this.move('left');
+                            break;
+                        case 'ArrowRight':
+                            this.move('right');
+                            break;
+                        case 'ArrowUp':
+                            this.move('up');
+                            break;
+                        case 'ArrowDown':
+                            this.move('down');
+                            break;
+                    }
+                });
+
+                // 触摸
+                const gridEl = document.getElementById('grid-container');
+
+                gridEl.addEventListener('touchstart', (e) => {
+                    if (e.touches.length > 1) return; // 忽略多指
+                    this.touchStartX = e.touches[0].clientX;
+                    this.touchStartY = e.touches[0].clientY;
+                }, {
+                    passive: false
+                });
+
+                gridEl.addEventListener('touchend', (e) => {
+                    if (!this.touchStartX || !this.touchStartY) return;
+
+                    const touchEndX = e.changedTouches[0].clientX;
+                    const touchEndY = e.changedTouches[0].clientY;
+
+                    const dx = touchEndX - this.touchStartX;
+                    const dy = touchEndY - this.touchStartY;
+
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        // 水平
+                        if (Math.abs(dx) > 30) { // 阈值
+                            if (dx > 0) this.move('right');
+                            else this.move('left');
+                        }
+                    } else {
+                        // 垂直
+                        if (Math.abs(dy) > 30) {
+                            if (dy > 0) this.move('down');
+                            else this.move('up');
+                        }
+                    }
+
+                    this.touchStartX = 0;
+                    this.touchStartY = 0;
+                }, {
+                    passive: false
+                });
+
+                // 防止拖拽图片
+                gridEl.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                }, {
+                    passive: false
+                });
+            }
+        }
+
+        // 启动游戏
+        const game = new Game2048();
+    </script>
+</body>
+
+</html>
