@@ -1,264 +1,522 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>愤怒的崔梓璇</title>
+    <!-- 加载Tailwind CSS用于界面美化 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 加载Matter.js 2D物理引擎 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
+        /* 使用Inter字体，并设置背景和布局 */
+        
         body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #87CEEB;
-            /* Sky blue background */
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            height: 100vh;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f4f8;
+            /* 浅灰色背景 */
+            overflow: hidden;
+            /* 防止页面滚动 */
         }
+        /* 游戏画布样式 */
         
         canvas {
+            background-color: #87CEEB;
+            /* 天蓝色背景 */
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             display: block;
-            touch-action: none;
-            /* Prevent default touch behaviors */
+        }
+        /* 游戏标题 */
+        
+        h1 {
+            color: #d81b60;
+            /* 崔梓璇主题粉色 */
+        }
+        /* 重置按钮 */
+        
+        .reset-button {
+            background-color: #d81b60;
+            transition: background-color 0.3s ease;
+        }
+        
+        .reset-button:hover {
+            background-color: #ad1457;
+        }
+        /* 游戏结束/胜利消息弹窗 */
+        
+        #message-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        #message-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        #message-box {
+            background-color: white;
+            padding: 2.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            text-align: center;
+        }
+        
+        #message-text {
+            font-size: 2.25rem;
+            font-weight: bold;
+            color: #333;
         }
     </style>
 </head>
 
-<body>
-    <canvas id="gameCanvas"></canvas>
+<body class="antialiased">
+
+    <h1 class="text-3xl font-bold my-4">愤怒的崔梓璇</h1>
+
+    <!-- 游戏信息栏 -->
+    <div class="flex justify-between w-full max-w-lg px-2 mb-2 text-lg">
+        <span class="font-semibold">剩余发射: <span id="shots-left" class="font-bold text-xl text-pink-600">5</span></span>
+    </div>
+
+    <!-- 游戏画布容器 -->
+    <div id="canvas-container"></div>
+
+    <!-- 控制按钮 -->
+    <button id="reset-button" class="reset-button text-white font-bold py-3 px-6 rounded-lg shadow-md mt-4 cursor-pointer">
+        重新开始
+    </button>
+
+    <!-- 游戏消息弹窗 -->
+    <div id="message-overlay">
+        <div id="message-box">
+            <span id="message-text"></span>
+        </div>
+    </div>
+
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
+        window.addEventListener('load', () => {
+            // --- Matter.js 模块别名 ---
+            const {
+                Engine,
+                Render,
+                Runner,
+                World,
+                Bodies,
+                Body,
+                Vector,
+                Composite,
+                Constraint,
+                Mouse,
+                Events
+            } = Matter;
 
-        // Set canvas to full screen for mobile
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+            // --- 全局变量 ---
+            let engine, world, render, runner;
+            let projectile, slingshot, slingshotAnchor;
+            let isDragging = false;
+            let isFired = false;
+            let shotsLeft = 5;
+            let targets = [];
+            let gameEnded = false;
 
-        // Game assets
-        const birds = [
-            new Image(), new Image(), new Image(), new Image(), new Image(),
-            new Image(), new Image(), new Image(), new Image(), new Image()
-        ];
-        birds[0].src = './images/崔梓璇01.gif';
-        birds[1].src = './images/崔梓璇02.gif';
-        birds[2].src = './images/崔梓璇03.gif';
-        birds[3].src = './images/崔梓璇04.gif';
-        birds[4].src = './images/崔梓璇05.gif';
-        birds[5].src = './images/崔梓璇06.gif';
-        birds[6].src = './images/崔梓璇07.gif';
-        birds[7].src = './images/崔梓璇08.gif';
-        birds[8].src = './images/崔梓璇09.gif';
-        birds[9].src = './images/崔梓璇10.gif';
+            // --- DOM 元素 ---
+            const canvasContainer = document.getElementById('canvas-container');
+            const shotsLeftEl = document.getElementById('shots-left');
+            const resetButton = document.getElementById('reset-button');
+            const messageOverlay = document.getElementById('message-overlay');
+            const messageText = document.getElementById('message-text');
 
-        const backgroundImg = new Image();
-        backgroundImg.src = './images/崔梓璇11.png'; // Use the PNG as background or obstacle
+            // --- 游戏设置 ---
+            const canvasWidth = Math.min(window.innerWidth - 20, 500); // 适配移动端宽度
+            const canvasHeight = 600;
+            const anchorPos = {
+                x: canvasWidth * 0.25,
+                y: canvasHeight * 0.75
+            };
+            const projectileRadius = 20;
+            const targetRadius = 25;
+            const boxSize = 60; // 11.png 方块大小
 
-        // Game variables
-        let currentBirdIndex = 0;
-        let bird = {
-            x: 100,
-            y: canvas.height - 200,
-            vx: 0,
-            vy: 0,
-            radius: 50,
-            launched: false,
-            dragging: false
-        };
-        const slingX = 100;
-        const slingY = canvas.height - 200;
-        const gravity = 0.5;
-        const elasticity = 0.8;
+            // --- 本地图片路径 (重要!) ---
+            // 假设HTML文件在 'images' 文件夹的上一级
+            const imgPath = 'images/';
+            const projectileImg = imgPath + '崔梓璇01.gif';
+            const targetImgs = [
+                imgPath + '崔梓璇02.gif',
+                imgPath + '崔梓璇03.gif',
+                imgPath + '崔梓璇04.gif',
+                imgPath + '崔梓璇05.gif',
+            ];
+            const boxImg = imgPath + '崔梓璇11.png'; // 大图用作方块
 
-        // Obstacles (simple boxes to destroy)
-        let obstacles = [{
-            x: canvas.width - 200,
-            y: canvas.height - 100,
-            width: 100,
-            height: 100,
-            destroyed: false
-        }, {
-            x: canvas.width - 250,
-            y: canvas.height - 200,
-            width: 100,
-            height: 100,
-            destroyed: false
-        }, {
-            x: canvas.width - 300,
-            y: canvas.height - 300,
-            width: 100,
-            height: 100,
-            destroyed: false
-        }];
+            /**
+             * 初始化游戏
+             */
+            function init() {
+                // --- 创建引擎 ---
+                engine = Engine.create();
+                world = engine.world;
+                engine.gravity.y = 1; // 正常重力
 
-        // Ground
-        const groundY = canvas.height - 50;
-
-        // Touch/mouse events
-        let touchStartX = 0,
-            touchStartY = 0;
-        let touchEndX = 0,
-            touchEndY = 0;
-
-        canvas.addEventListener('touchstart', handleTouchStart);
-        canvas.addEventListener('touchmove', handleTouchMove);
-        canvas.addEventListener('touchend', handleTouchEnd);
-
-        // For desktop testing
-        canvas.addEventListener('mousedown', handleTouchStart);
-        canvas.addEventListener('mousemove', handleTouchMove);
-        canvas.addEventListener('mouseup', handleTouchEnd);
-
-        function handleTouchStart(e) {
-            e.preventDefault();
-            const touch = e.touches ? e.touches[0] : e;
-            touchStartX = touch.clientX;
-            touchStartY = touch.clientY;
-            if (!bird.launched && Math.hypot(touchStartX - bird.x, touchStartY - bird.y) < bird.radius) {
-                bird.dragging = true;
-            }
-        }
-
-        function handleTouchMove(e) {
-            e.preventDefault();
-            if (bird.dragging) {
-                const touch = e.touches ? e.touches[0] : e;
-                bird.x = touch.clientX;
-                bird.y = touch.clientY;
-            }
-        }
-
-        function handleTouchEnd(e) {
-            e.preventDefault();
-            if (bird.dragging) {
-                const touch = e.changedTouches ? e.changedTouches[0] : e;
-                touchEndX = touch.clientX;
-                touchEndY = touch.clientY;
-                launchBird();
-                bird.dragging = false;
-            }
-        }
-
-        function launchBird() {
-            const dx = slingX - bird.x;
-            const dy = slingY - bird.y;
-            bird.vx = dx / 5; // Scale velocity
-            bird.vy = dy / 5;
-            bird.launched = true;
-        }
-
-        function update() {
-            if (bird.launched) {
-                bird.vy += gravity;
-                bird.x += bird.vx;
-                bird.y += bird.vy;
-
-                // Collision with ground
-                if (bird.y + bird.radius > groundY) {
-                    bird.y = groundY - bird.radius;
-                    bird.vy = -bird.vy * elasticity;
-                    bird.vx *= elasticity;
-                    if (Math.abs(bird.vy) < 1) bird.vy = 0;
-                    if (Math.abs(bird.vx) < 1) bird.vx = 0;
-                }
-
-                // Check collisions with obstacles
-                obstacles.forEach(obs => {
-                    if (!obs.destroyed && checkCollision(bird, obs)) {
-                        obs.destroyed = true;
-                        bird.vx *= -elasticity;
-                        bird.vy *= -elasticity;
+                // --- 创建渲染器 ---
+                render = Render.create({
+                    element: canvasContainer,
+                    engine: engine,
+                    options: {
+                        width: canvasWidth,
+                        height: canvasHeight,
+                        wireframes: false, // 我们要看贴图!
+                        background: '#87CEEB'
                     }
                 });
+                Render.run(render);
 
-                // Stop if velocity is low
-                if (Math.abs(bird.vx) < 0.1 && Math.abs(bird.vy) < 0.1 && bird.y + bird.radius >= groundY) {
-                    resetBird();
-                }
-            }
-        }
+                // --- 创建运行器 ---
+                runner = Runner.create();
+                Runner.run(runner, engine);
 
-        function checkCollision(bird, obs) {
-            return bird.x + bird.radius > obs.x && bird.x - bird.radius < obs.x + obs.width &&
-                bird.y + bird.radius > obs.y && bird.y - bird.radius < obs.y + obs.height;
-        }
+                // --- 重置游戏状态 ---
+                resetGame();
 
-        function resetBird() {
-            currentBirdIndex = (currentBirdIndex + 1) % birds.length;
-            bird = {
-                x: slingX,
-                y: slingY,
-                vx: 0,
-                vy: 0,
-                radius: 50,
-                launched: false,
-                dragging: false
-            };
-        }
+                // --- 绑定事件 ---
+                resetButton.addEventListener('click', resetGame);
+                setupMouseAndTouch();
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw background
-            ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
-
-            // Draw ground
-            ctx.fillStyle = '#228B22';
-            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
-
-            // Draw sling (simple lines)
-            if (!bird.launched) {
-                ctx.beginPath();
-                ctx.moveTo(slingX - 20, slingY + 50);
-                ctx.lineTo(bird.x, bird.y);
-                ctx.lineTo(slingX + 20, slingY + 50);
-                ctx.strokeStyle = '#8B4513';
-                ctx.lineWidth = 5;
-                ctx.stroke();
+                // --- 游戏循环 ---
+                Events.on(engine, 'afterUpdate', checkGameStatus);
             }
 
-            // Draw bird
-            ctx.drawImage(birds[currentBirdIndex], bird.x - bird.radius, bird.y - bird.radius, bird.radius * 2, bird.radius * 2);
+            /**
+             * 重置游戏
+             */
+            function resetGame() {
+                gameEnded = false;
+                isFired = false;
+                isDragging = false;
+                shotsLeft = 5;
+                targets = [];
+                updateUI();
+                hideMessage();
 
-            // Draw obstacles
-            ctx.fillStyle = '#CD853F';
-            obstacles.forEach(obs => {
-                if (!obs.destroyed) {
-                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                }
-            });
+                // 清空世界
+                World.clear(world);
 
-            // Check win condition
-            if (obstacles.every(obs => obs.destroyed)) {
-                ctx.font = '40px Arial';
-                ctx.fillStyle = 'white';
-                ctx.fillText('胜利！愤怒的崔梓璇摧毁了所有障碍！', canvas.width / 2 - 300, canvas.height / 2);
+                // 创建关卡
+                createLevel();
+
+                // 加载第一发炮弹
+                loadNextShot();
             }
-        }
 
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
+            /**
+             * 创建关卡元素
+             */
+            function createLevel() {
+                // 创建地面
+                World.add(world, Bodies.rectangle(canvasWidth / 2, canvasHeight - 20, canvasWidth, 40, {
+                    isStatic: true,
+                    render: {
+                        fillStyle: '#4A3B31'
+                    } // 棕色地面
+                }));
 
-        // Wait for images to load
-        let loaded = 0;
-        birds.forEach(img => {
-            img.onload = () => {
-                loaded++;
-                if (loaded === birds.length + 1) { // +1 for background
-                    gameLoop();
+                // 创建弹弓的视觉锚点
+                slingshotAnchor = Bodies.circle(anchorPos.x, anchorPos.y, 10, {
+                    isStatic: true,
+                    render: {
+                        fillStyle: '#333'
+                    }
+                });
+                World.add(world, slingshotAnchor);
+
+                // --- 创建目标结构 ---
+                // 平台
+                World.add(world, Bodies.rectangle(canvasWidth * 0.75, canvasHeight - 100, canvasWidth * 0.4, 20, {
+                    isStatic: true,
+                    render: {
+                        fillStyle: '#A0522D'
+                    } // 棕色平台
+                }));
+
+                // 创建方块 (11.png)
+                const box = Bodies.rectangle(canvasWidth * 0.75, canvasHeight - 140, boxSize, boxSize, {
+                    render: {
+                        sprite: {
+                            texture: boxImg,
+                            xScale: boxSize / 400, // 假设11.png是400x400
+                            yScale: boxSize / 400
+                        }
+                    }
+                });
+                targets.push(box);
+
+                // 创建目标 (02.gif, 03.gif)
+                const target1 = Bodies.circle(canvasWidth * 0.7, canvasHeight - 140, targetRadius, {
+                    render: {
+                        sprite: {
+                            texture: targetImgs[0],
+                            xScale: (targetRadius * 2) / 100, // 假设GIF是100x100
+                            yScale: (targetRadius * 2) / 100
+                        }
+                    }
+                });
+                targets.push(target1);
+
+                const target2 = Bodies.circle(canvasWidth * 0.8, canvasHeight - 140, targetRadius, {
+                    render: {
+                        sprite: {
+                            texture: targetImgs[1],
+                            xScale: (targetRadius * 2) / 100,
+                            yScale: (targetRadius * 2) / 100
+                        }
+                    }
+                });
+                targets.push(target2);
+
+                const target3 = Bodies.circle(canvasWidth * 0.75, canvasHeight - 190, targetRadius, {
+                    render: {
+                        sprite: {
+                            texture: targetImgs[2],
+                            xScale: (targetRadius * 2) / 100,
+                            yScale: (targetRadius * 2) / 100
+                        }
+                    }
+                });
+                targets.push(target3);
+
+                // 将所有目标添加到世界
+                World.add(world, [box, target1, target2, target3]);
+            }
+
+            /**
+             * 加载下一发炮弹
+             */
+            function loadNextShot() {
+                if (shotsLeft > 0 && !gameEnded) {
+                    isFired = false;
+                    projectile = Bodies.circle(anchorPos.x, anchorPos.y, projectileRadius, {
+                        restitution: 0.5, // 弹力
+                        render: {
+                            sprite: {
+                                texture: projectileImg,
+                                xScale: (projectileRadius * 2) / 100, // 假设01.gif是100x100
+                                yScale: (projectileRadius * 2) / 100
+                            }
+                        }
+                    });
+
+                    slingshot = Constraint.create({
+                        pointA: anchorPos,
+                        bodyB: projectile,
+                        stiffness: 0.05,
+                        length: 1,
+                        render: {
+                            visible: true, // 显示弹弓皮筋
+                            strokeStyle: '#333'
+                        }
+                    });
+
+                    World.add(world, [projectile, slingshot]);
                 }
-            };
+            }
+
+            /**
+             * 设置鼠标和触摸事件
+             */
+            function setupMouseAndTouch() {
+                const canvas = render.canvas;
+                let mouse = Mouse.create(canvas);
+
+                const handleDown = (event) => {
+                    if (gameEnded || isFired) return;
+                    const pos = getEventPosition(event);
+                    if (pos && isNearProjectile(pos)) {
+                        isDragging = true;
+                    }
+                };
+
+                const handleMove = (event) => {
+                    if (!isDragging || gameEnded) return;
+                    const pos = getEventPosition(event);
+                    if (pos) {
+                        // 限制拖拽范围
+                        const dx = pos.x - anchorPos.x;
+                        const dy = pos.y - anchorPos.y;
+                        const maxDrag = 100;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance > maxDrag) {
+                            const scale = maxDrag / distance;
+                            pos.x = anchorPos.x + dx * scale;
+                            pos.y = anchorPos.y + dy * scale;
+                        }
+
+                        Body.setPosition(projectile, pos);
+                        Body.setVelocity(projectile, {
+                            x: 0,
+                            y: 0
+                        }); // 防止拖动时抖动
+                    }
+                };
+
+                const handleUp = (event) => {
+                    if (!isDragging || gameEnded) return;
+                    isDragging = false;
+                    isFired = true;
+                    shotsLeft--;
+                    updateUI();
+
+                    // 移除约束并发射
+                    World.remove(world, slingshot);
+
+                    const forceMagnitude = 0.05; // 发射力度
+                    const force = {
+                        x: (anchorPos.x - projectile.position.x) * forceMagnitude,
+                        y: (anchorPos.y - projectile.position.y) * forceMagnitude
+                    };
+
+                    Body.applyForce(projectile, projectile.position, force);
+
+                    // 2秒后加载下一发
+                    setTimeout(loadNextShot, 2000);
+                };
+
+                // 鼠标事件
+                canvas.addEventListener('mousedown', handleDown);
+                canvas.addEventListener('mousemove', handleMove);
+                canvas.addEventListener('mouseup', handleUp);
+                canvas.addEventListener('mouseleave', handleUp); // 移出画布也算松开
+
+                // 触摸事件
+                canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    handleDown(e);
+                }, {
+                    passive: false
+                });
+                canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    handleMove(e);
+                }, {
+                    passive: false
+                });
+                canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    handleUp(e);
+                }, {
+                    passive: false
+                });
+                canvas.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    handleUp(e);
+                }, {
+                    passive: false
+                });
+
+                // 辅助函数：获取事件坐标
+                function getEventPosition(event) {
+                    let pos;
+                    if (event.touches) {
+                        if (event.touches.length > 0) {
+                            pos = event.touches[0];
+                        } else {
+                            return null; // touchend
+                        }
+                    } else {
+                        pos = event;
+                    }
+                    const rect = canvas.getBoundingClientRect();
+                    return {
+                        x: pos.clientX - rect.left,
+                        y: pos.clientY - rect.top
+                    };
+                }
+
+                // 辅助函数：检查是否点中炮弹
+                function isNearProjectile(pos) {
+                    if (!projectile) return false;
+                    const dx = pos.x - projectile.position.x;
+                    const dy = pos.y - projectile.position.y;
+                    return (dx * dx + dy * dy) < (projectileRadius + 10) * (projectileRadius + 10); // 增加点击范围
+                }
+            }
+
+            /**
+             * 游戏循环中检查状态
+             */
+            function checkGameStatus() {
+                if (gameEnded) return;
+
+                // 移除掉出界外的目标
+                targets = targets.filter(target => {
+                    if (target.position.y > canvasHeight + 50 || target.position.x < -50 || target.position.x > canvasWidth + 50) {
+                        World.remove(world, target);
+                        return false;
+                    }
+                    return true;
+                });
+
+                // 检查胜利
+                if (targets.length === 0) {
+                    gameEnded = true;
+                    showMessage('你赢了！');
+                }
+                // 检查失败
+                else if (shotsLeft === 0 && !isDragging && isFired) {
+                    // 检查是否所有物体都停止了
+                    let allStopped = true;
+                    const bodies = Composite.allBodies(world);
+                    for (let body of bodies) {
+                        if (!body.isStatic && body.speed > 0.1) {
+                            allStopped = false;
+                            break;
+                        }
+                    }
+
+                    if (allStopped) {
+                        gameEnded = true;
+                        showMessage('失败了，再试一次！');
+                    }
+                }
+            }
+
+            // --- UI 辅助函数 ---
+
+            function updateUI() {
+                shotsLeftEl.textContent = shotsLeft;
+            }
+
+            function showMessage(msg) {
+                messageText.textContent = msg;
+                messageOverlay.classList.add('show');
+            }
+
+            function hideMessage() {
+                messageOverlay.classList.remove('show');
+            }
+
+            // --- 启动游戏 ---
+            init();
         });
-        backgroundImg.onload = () => {
-            loaded++;
-            if (loaded === birds.length + 1) {
-                gameLoop();
-            }
-        };
     </script>
 </body>
 
