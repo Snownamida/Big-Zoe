@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>暴打崔梓璇</title>
+    <style>
+        /* ==================== 
+           基础样式 
+           ==================== */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+        }
+        
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #ffe4e1;
+            font-family: 'Arial', sans-serif;
+            background-image: radial-gradient(circle at 50% 30%, #fff0f5 0%, #ffe4e1 80%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        /* ==================== 
+           顶部 UI 
+           ==================== */
+        
+        .header {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(5px);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.8);
+            z-index: 10;
+        }
+        
+        .header-item {
+            text-align: center;
+            color: #d63384;
+        }
+        
+        .label {
+            font-size: 12px;
+            font-weight: bold;
+            opacity: 0.8;
+            display: block;
+        }
+        
+        .value {
+            font-size: 24px;
+            font-weight: 800;
+            text-shadow: 1px 1px 0 #fff;
+        }
+        
+        #time-value {
+            color: #ff4500;
+        }
+        
+        #combo-value {
+            color: #9932CC;
+            transform: scale(1);
+            transition: transform 0.1s;
+        }
+        
+        .combo-active {
+            transform: scale(1.5) !important;
+        }
+        /* ==================== 
+           游戏区域 
+           ==================== */
+        
+        #game-board {
+            flex: 1;
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            width: 100%;
+        }
+        /* 地鼠洞 */
+        
+        .hole {
+            position: relative;
+            width: 100%;
+            padding-bottom: 100%;
+            /* 保持正方形 */
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            border: 4px solid rgba(255, 255, 255, 0.8);
+            box-shadow: inset 0 5px 10px rgba(214, 51, 132, 0.1);
+            overflow: hidden;
+            /* 隐藏在洞下面的部分 */
+            cursor: pointer;
+        }
+        /* 崔梓璇 (地鼠) */
+        
+        .cui {
+            position: absolute;
+            bottom: -100%;
+            /* 初始在洞下面 */
+            left: 5%;
+            width: 90%;
+            height: 90%;
+            border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            transition: bottom 0.1s ease-out;
+            /* 弹起动画 */
+            pointer-events: none;
+            /* 让点击事件穿透到 hole 处理，或者直接处理 click */
+            border: 3px solid transparent;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        /* 激活状态：弹起 */
+        
+        .hole.up .cui {
+            bottom: 5%;
+        }
+        /* 被击中效果 */
+        
+        .hole.whacked .cui {
+            transform: scale(0.9);
+            filter: brightness(1.2);
+        }
+        /* ==================== 
+           浮动得分特效 
+           ==================== */
+        
+        .float-score {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: #ff1493;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            text-shadow: 0 0 3px #fff;
+            z-index: 20;
+        }
+        
+        @keyframes floatUp {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-50px) scale(1.5);
+                opacity: 0;
+            }
+        }
+        /* ==================== 
+           菜单与遮罩 
+           ==================== */
+        
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+        
+        .title {
+            font-size: 36px;
+            font-weight: 800;
+            color: #d63384;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 0 #fff;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #ff69b4, #d63384);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(214, 51, 132, 0.4);
+            transition: transform 0.1s;
+            text-decoration: none;
+            margin: 10px;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-secondary {
+            background: #fff;
+            color: #d63384;
+            border: 2px solid #d63384;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        /* 移动端点击高亮去除 */
+        
+        div {
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 顶部数据栏 -->
+    <div class="header">
+        <div class="header-item">
+            <span class="label">时间</span>
+            <span class="value" id="time-value">30</span>
+        </div>
+        <div class="header-item">
+            <span class="label">连击</span>
+            <span class="value" id="combo-value">0</span>
+        </div>
+        <div class="header-item">
+            <span class="label">得分</span>
+            <span class="value" id="score-value">0</span>
+        </div>
+    </div>
+
+    <!-- 游戏主区域 -->
+    <div id="game-board">
+        <div class="grid">
+            <!-- 9个洞 -->
+            <div class="hole" id="hole-0">
+                <div class="cui"></div>
+            </div>
+            <div class="hole" id="hole-1">
+                <div class="cui"></div>
+            </div>
+            <div class="hole" id="hole-2">
+                <div class="cui"></div>
+            </div>
+            <div class="hole" id="hole-3">
+                <div class="cui"></div>
+            </div>
+            <div class="hole" id="hole-4">
+                <div class="cui"></div>
+            </div>
+            <div class="hole" id="hole-5">
+                <div class="cui"></div>
+            </div>
+            <div class="hole" id="hole-6">
+                <div class="cui"></div>
+            </div>
+            <div class="hole" id="hole-7">
+                <div class="cui"></div>
+            </div>
+            <div class="hole" id="hole-8">
+                <div class="cui"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 开始/结束 遮罩 -->
+    <div id="start-screen" class="overlay">
+        <div class="title">暴击崔梓璇</div>
+        <div style="margin-bottom: 20px; color: #666; font-size: 14px; padding: 0 20px; text-align: center;">
+            <p>点击冒出来的崔梓璇得分！</p>
+            <p>连击越高，分数越高。</p>
+            <p>如果看到 <span style="color:#d63384; font-weight:bold;">金色传说</span>，千万别放过！</p>
+        </div>
+        <button class="btn" onclick="startGame()">开始游戏</button>
+        <div style="margin-top: 20px;">
+            <a href="index.html" class="btn btn-secondary" style="font-size: 14px; padding: 10px 20px;">回合成版</a>
+            <a href="2048.html" class="btn btn-secondary" style="font-size: 14px; padding: 10px 20px;">回2048版</a>
+        </div>
+    </div>
+
+    <div id="game-over-screen" class="overlay hidden">
+        <div class="title">时间到！</div>
+        <div style="font-size: 24px; color: #333; margin-bottom: 10px;">最终得分</div>
+        <div id="final-score" style="font-size: 48px; font-weight: bold; color: #d63384; margin-bottom: 30px;">0</div>
+        <button class="btn" onclick="startGame()">再来一次</button>
+        <div style="margin-top: 20px;">
+            <a href="index.html" class="btn btn-secondary" style="font-size: 14px; padding: 10px 20px;">回合成版</a>
+        </div>
+    </div>
+
+    <script>
+        // ===========================
+        // 配置数据
+        // ===========================
+        const IMG_PATH = 'images/';
+        // 复用之前的等级配置，用于决定图片和稀有度
+        const LEVELS = [{
+                id: 0,
+                file: '崔梓璇01.gif',
+                score: 10,
+                bg: '#FFFACD',
+                border: '#FFD700',
+                weight: 30
+            }, {
+                id: 1,
+                file: '崔梓璇02.gif',
+                score: 10,
+                bg: '#FFA07A',
+                border: '#FF4500',
+                weight: 25
+            }, {
+                id: 2,
+                file: '崔梓璇03.gif',
+                score: 20,
+                bg: '#FF6347',
+                border: '#DC143C',
+                weight: 15
+            }, {
+                id: 3,
+                file: '崔梓璇04.gif',
+                score: 20,
+                bg: '#90EE90',
+                border: '#3CB371',
+                weight: 10
+            }, {
+                id: 4,
+                file: '崔梓璇05.gif',
+                score: 30,
+                bg: '#32CD32',
+                border: '#228B22',
+                weight: 8
+            }, {
+                id: 5,
+                file: '崔梓璇06.gif',
+                score: 30,
+                bg: '#87CEFA',
+                border: '#4682B4',
+                weight: 6
+            }, {
+                id: 6,
+                file: '崔梓璇07.gif',
+                score: 40,
+                bg: '#4169E1',
+                border: '#191970',
+                weight: 4
+            }, {
+                id: 7,
+                file: '崔梓璇08.gif',
+                score: 50,
+                bg: '#9932CC',
+                border: '#800080',
+                weight: 3
+            }, {
+                id: 8,
+                file: '崔梓璇09.gif',
+                score: 80,
+                bg: '#FFD700',
+                border: '#B8860B',
+                weight: 2
+            }, {
+                id: 9,
+                file: '崔梓璇10.gif',
+                score: 100,
+                bg: '#C0C0C0',
+                border: '#808080',
+                weight: 1
+            }, {
+                id: 10,
+                file: '崔梓璇11.png',
+                score: 200,
+                bg: '#228B22',
+                border: '#3CB371',
+                weight: 0.5
+            } // 稀有
+        ];
+
+        // ===========================
+        // 游戏状态
+        // ===========================
+        let lastHole;
+        let timeUp = false;
+        let score = 0;
+        let timeLeft = 30;
+        let combo = 0;
+        let gameTimer;
+        let peepTimer;
+        let holes = document.querySelectorAll('.hole');
+        let scoreBoard = document.getElementById('score-value');
+        let timeBoard = document.getElementById('time-value');
+        let comboBoard = document.getElementById('combo-value');
+
+        // ===========================
+        // 游戏逻辑
+        // ===========================
+
+        // 随机选择一个洞
+        function randomHole(holes) {
+            const idx = Math.floor(Math.random() * holes.length);
+            const hole = holes[idx];
+            if (hole === lastHole) {
+                return randomHole(holes);
+            }
+            lastHole = hole;
+            return hole;
+        }
+
+        // 随机选择一个角色 (基于权重)
+        function randomCharacter() {
+            const totalWeight = LEVELS.reduce((sum, l) => sum + l.weight, 0);
+            let random = Math.random() * totalWeight;
+
+            for (let level of LEVELS) {
+                if (random < level.weight) {
+                    return level;
+                }
+                random -= level.weight;
+            }
+            return LEVELS[0];
+        }
+
+        // 角色冒头
+        function peep() {
+            // 根据时间动态调整难度：时间越少，出现越快
+            const minTime = timeLeft > 10 ? 400 : 250;
+            const maxTime = timeLeft > 10 ? 800 : 500;
+            const time = Math.round(Math.random() * (maxTime - minTime) + minTime);
+
+            const hole = randomHole(holes);
+            const character = randomCharacter();
+            const cuiDiv = hole.querySelector('.cui');
+
+            // 设置样式
+            cuiDiv.style.backgroundImage = `url('${IMG_PATH}${character.file}')`;
+            cuiDiv.style.backgroundColor = character.bg;
+            cuiDiv.style.borderColor = character.border;
+            cuiDiv.dataset.score = character.score;
+            cuiDiv.dataset.id = character.id; // 用于判断是否是稀有
+
+            hole.classList.add('up');
+
+            // 自动缩回
+            let currentPeepTimeout = setTimeout(() => {
+                if (!hole.classList.contains('whacked')) {
+                    // 如果没被打中就缩回，连击中断
+                    if (combo > 0) {
+                        combo = 0;
+                        updateCombo();
+                    }
+                }
+                hole.classList.remove('up');
+                hole.classList.remove('whacked'); // 重置打击状态
+                if (!timeUp) peep();
+            }, time);
+
+            // 将 timeout 绑定到 element 上，以便打击时取消自动缩回逻辑（如果需要）
+            hole.dataset.timeoutId = currentPeepTimeout;
+        }
+
+        function startGame() {
+            scoreBoard.textContent = 0;
+            timeBoard.textContent = 30;
+            comboBoard.textContent = 0;
+
+            score = 0;
+            timeLeft = 30;
+            combo = 0;
+            timeUp = false;
+
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+
+            peep();
+
+            // 倒计时
+            gameTimer = setInterval(() => {
+                timeLeft--;
+                timeBoard.textContent = timeLeft;
+                if (timeLeft <= 5) {
+                    timeBoard.style.color = 'red';
+                    timeBoard.style.transform = 'scale(1.2)';
+                } else {
+                    timeBoard.style.color = '#ff4500';
+                    timeBoard.style.transform = 'scale(1)';
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(gameTimer);
+                    timeUp = true;
+                    setTimeout(() => {
+                        document.getElementById('final-score').textContent = score;
+                        document.getElementById('game-over-screen').classList.remove('hidden');
+                    }, 500); // 稍微延迟等待最后一个动画
+                }
+            }, 1000);
+        }
+
+        // ===========================
+        // 点击处理
+        // ===========================
+        function bonk(e) {
+            if (!e.isTrusted) return; // 防止脚本作弊
+
+            // e.currentTarget 是绑定事件的 hole 元素
+            const hole = e.currentTarget;
+
+            // 只有在弹起且未被打击时才有效
+            if (!hole.classList.contains('up') || hole.classList.contains('whacked')) return;
+
+            hole.classList.add('whacked');
+            hole.classList.remove('up'); // 立即缩回视觉效果
+
+            const cuiDiv = hole.querySelector('.cui');
+            const baseScore = parseInt(cuiDiv.dataset.score);
+            const isRare = parseInt(cuiDiv.dataset.id) >= 10;
+
+            // 计算连击加成
+            combo++;
+            let multiplier = 1 + Math.floor(combo / 5) * 0.2; // 每5连击增加0.2倍率
+            let finalScore = Math.floor(baseScore * multiplier);
+
+            score += finalScore;
+            scoreBoard.textContent = score;
+
+            // 稀有奖励：加时间
+            if (isRare) {
+                timeLeft += 2;
+                timeBoard.textContent = timeLeft + "+2";
+                setTimeout(() => timeBoard.textContent = timeLeft, 500);
+            }
+
+            updateCombo();
+            showFloatScore(e.clientX || e.touches[0].clientX, e.clientY || e.touches[0].clientY, finalScore, isRare);
+        }
+
+        function updateCombo() {
+            comboBoard.textContent = combo;
+            if (combo > 5) {
+                comboBoard.classList.add('combo-active');
+                setTimeout(() => comboBoard.classList.remove('combo-active'), 100);
+            }
+        }
+
+        function showFloatScore(x, y, amount, isRare) {
+            const el = document.createElement('div');
+            el.classList.add('float-score');
+            el.textContent = "+" + amount;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+
+            if (isRare) {
+                el.style.color = '#FFD700'; // 金色
+                el.style.fontSize = '36px';
+                el.textContent = "CRITICAL +" + amount;
+            }
+
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        // ===========================
+        // 初始化事件监听
+        // ===========================
+        holes.forEach(hole => {
+            // 同时支持触摸和鼠标
+            hole.addEventListener('mousedown', bonk);
+            hole.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // 防止触发鼠标事件，导致双重判定
+                bonk(e);
+            });
+        });
+    </script>
+</body>
+
+</html>
