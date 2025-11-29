@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>合成女生 (Synthetic Girl)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        /* CSS reset 和基础样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            /* 禁止移动端长按选中文字和图片 */
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* 禁止滚动 */
+            background-color: #d2b48c; /* 模拟墙壁底色 */
+            font-family: 'Arial', sans-serif;
+            /* 模拟背景墙和开关的简单视觉效果 */
+            background-image: radial-gradient(circle at 50% 30%, #e6ccb3 0%, #d2b48c 80%);
+        }
+
+        /* 游戏主容器 */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            max-width: 500px; /*在大屏幕上限制最大宽度 */
+            margin: 0 auto;
+            background: transparent;
+        }
+
+        /* 顶部导航栏 (模拟原图) */
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            background: rgba(255,255,255,0.3);
+        }
+        .header-icons span { margin-left: 10px; cursor: pointer;}
+
+        /* 游戏UI栏 (分数和下一个提示) */
+        .game-ui-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 10px 20px;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .score-box { font-size: 24px; font-weight: bold; }
+
+        .next-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .next-label { font-size: 14px; margin-bottom: 5px; }
+        /* 下一个提示的容器 */
+        #next-item-preview {
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid rgba(255,255,255,0.5);
+        }
+        #next-item-preview canvas {
+            border-radius: 50%;
+        }
+
+        /* Canvas 画布容器 */
+        #canvas-wrapper {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            /* 底部留一点空间模拟地板 */
+            margin-bottom: 20px; 
+            /* 模拟透明容器的边框线 */
+            border-bottom: 3px solid rgba(255,255,255,0.6);
+            border-left: 3px solid rgba(255,255,255,0.3);
+            border-right: 3px solid rgba(255,255,255,0.3);
+            border-radius: 0 0 20px 20px;
+            overflow: hidden;
+        }
+        
+        /* 实际的游戏画布 */
+        #world {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 游戏结束遮罩 */
+        #game-over-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            display: none; /* 默认隐藏 */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        #game-over-overlay h2 { font-size: 32px; margin-bottom: 20px; color: #ff6b6b;}
+        #restart-btn {
+            padding: 10px 20px;
+            font-size: 20px;
+            background: #4CAF50;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div class="header-bar">
+            <div>← 合成女生 (Synthetic Girl)</div>
+            <div class="header-icons"><span>•••</span><span>◉</span></div>
+        }
+        </div>
+
+        <div class="game-ui-bar">
+            <div class="score-box">SCORE: <span id="score">0</span></div>
+            <div class="next-box">
+                <span class="next-label">NEXT:</span>
+                <div id="next-item-preview">
+                    </div>
+            </div>
+        </div>
+
+        <div id="canvas-wrapper">
+            <canvas id="world"></canvas>
+            <div id="game-over-overlay">
+                <h2>GAME OVER</h2>
+                <button id="restart-btn">重新开始</button>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+// ===========================
+// 游戏配置与素材定义
+// ===========================
+
+// 定义 11 个等级的“水果”（女生头像）属性
+// radius: 半径 (px), color: 占位颜色, score: 合并得分
+const FRUIT_LEVELS = [
+    { radius: 15, color: '#FFB6C1', score: 2, label: 'Lv1\n搞怪' },     // 0: 最小
+    { radius: 22, color: '#FF69B4', score: 4, label: 'Lv2\n鬼脸' },
+    { radius: 30, color: '#FF1493', score: 8, label: 'Lv3\n斜眼' },
+    { radius: 38, color: '#DB7093', score: 16, label: 'Lv4\n微笑' },
+    { radius: 47, color: '#C71585', score: 32, label: 'Lv5\n平静' },
+    { radius: 57, color: '#8B008B', score: 64, label: 'Lv6\n开心' },
+    { radius: 68, color: '#9400D3', score: 128, label: 'Lv7\n大笑' },
+    { radius: 80, color: '#9932CC', score: 256, label: 'Lv8\n捏脸' },
+    { radius: 93, color: '#BA55D3', score: 512, label: 'Lv9\n帽子' },
+    { radius: 107, color: '#DA70D6', score: 1024, label: 'Lv10\n眼镜' },
+    // 最终的大西瓜：绿色，代表原图中坐在椅子上指人的全景
+    { radius: 125, color: '#228B22', score: 2048, label: 'Lv11\n终极\n坐姿' } // 10: 最大
+];
+
+// 为了代替真实图片，我们用 Canvas 预生成带文字的圆形贴图
+const textures = {};
+function generateTextures() {
+    FRUIT_LEVELS.forEach((fruit, index) => {
+        const canvas = document.createElement('canvas');
+        const size = fruit.radius * 2 + 4; // 稍微大一点留边框
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // 绘制圆形背景
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, fruit.radius, 0, Math.PI * 2);
+        ctx.fillStyle = fruit.color;
+        ctx.fill();
+        // 绘制边框
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 绘制文字标签
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold ' + (fruit.radius * 0.4) + 'px Arial';
+        // 处理换行
+        const lines = fruit.label.split('\n');
+        const lineHeight = fruit.radius * 0.45;
+        lines.forEach((line, i) => {
+            const yOffset = (i - (lines.length-1)/2) * lineHeight;
+            ctx.fillText(line, size/2, size/2 + yOffset);
+        });
+
+        textures[index] = canvas.toDataURL();
+    });
+}
+generateTextures();
+
+
+// ===========================
+// Matter.js 初始化
+// ===========================
+const Engine = Matter.Engine,
+      Render = Matter.Render,
+      Runner = Matter.Runner,
+      Bodies = Matter.Bodies,
+      World = Matter.World,
+      Events = Matter.Events,
+      Composite = Matter.Composite;
+
+const engine = Engine.create();
+const world = engine.world;
+
+const canvas = document.getElementById('world');
+const canvasWrapper = document.getElementById('canvas-wrapper');
+let canvasWidth = canvasWrapper.clientWidth;
+let canvasHeight = canvasWrapper.clientHeight;
+
+const render = Render.create({
+    canvas: canvas,
+    engine: engine,
+    options: {
+        width: canvasWidth,
+        height: canvasHeight,
+        wireframes: false, // 关闭线框模式，显示贴图
+        background: 'transparent', // 透明背景，透出底部的CSS背景
+        pixelRatio: window.devicePixelRatio // 高清屏适配
+    }
+});
+
+// ===========================
+// 游戏状态变量
+// ===========================
+let currentFruit = null; // 当前在顶部等待下落的水果
+let nextFruitLevel = 0;  // 下一个即将出现的水果等级
+let score = 0;
+let isDropping = false; // 防止连续快速点击
+let isGameOver = false;
+const SPAWN_Y = 50; // 下落生成高度
+
+// ===========================
+// 游戏辅助函数
+// ===========================
+
+// 创建边界墙壁
+function createWalls() {
+    const wallThickness = 60;
+    const ground = Bodies.rectangle(canvasWidth / 2, canvasHeight + wallThickness / 2, canvasWidth + wallThickness*2, wallThickness, { isStatic: true, render: { visible: false } });
+    const leftWall = Bodies.rectangle(-wallThickness / 2, canvasHeight / 2, wallThickness, canvasHeight * 2, { isStatic: true, render: { visible: false } });
+    const rightWall = Bodies.rectangle(canvasWidth + wallThickness / 2, canvasHeight / 2, wallThickness, canvasHeight * 2, { isStatic: true, render: { visible: false } });
+    // 顶部稍微留空，不设物理墙，但用于判断游戏结束
+    World.add(world, [ground, leftWall, rightWall]);
+}
+
+// 创建一个水果刚体
+function createFruitBody(x, y, level, isSensor = false) {
+    const fruitData = FRUIT_LEVELS[level];
+    return Bodies.circle(x, y, fruitData.radius, {
+        isSensor: isSensor, // 如果是传感器，则不参与物理碰撞（用于顶部预览）
+        isStatic: isSensor,
+        restitution: 0.2, // 弹性
+        friction: 0.1,    // 摩擦力
+        density: 0.001,   // 密度
+        label: 'fruit_' + level, // 用于碰撞检测识别
+        render: {
+            sprite: {
+                texture: textures[level],
+                xScale: 1,
+                yScale: 1
+            }
+        }
+    });
+}
+
+// 生成下一个随机水果等级 (只生成前5种小水果)
+function getRandomNextLevel() {
+    return Math.floor(Math.random() * 5);
+}
+
+// 更新 UI 显示
+function updateUI() {
+    document.getElementById('score').innerText = score;
+    const previewContainer = document.getElementById('next-item-preview');
+    previewContainer.innerHTML = '';
+    const previewImg = new Image();
+    previewImg.src = textures[nextFruitLevel];
+    // 缩放预览图以适应小框
+    const scale = 40 / (FRUIT_LEVELS[nextFruitLevel].radius * 2);
+    previewImg.style.width = (FRUIT_LEVELS[nextFruitLevel].radius * 2 * scale) + 'px';
+    previewImg.style.height = 'auto';
+    previewContainer.appendChild(previewImg);
+}
+
+// 生成顶部当前等待的水果
+function spawnCurrentFruit() {
+    if (isGameOver) return;
+    const level = nextFruitLevel;
+    // 初始在中间，Sensor 状态，不碰撞
+    currentFruit = createFruitBody(canvasWidth / 2, SPAWN_Y, level, true);
+    World.add(world, currentFruit);
+    
+    // 准备下下个
+    nextFruitLevel = getRandomNextLevel();
+    updateUI();
+    isDropping = false;
+}
+
+// 游戏结束处理
+function checkGameOver() {
+    const fruits = Composite.allBodies(world).filter(body => body.label.startsWith('fruit'));
+    for (let i = 0; i < fruits.length; i++) {
+        const body = fruits[i];
+        // 如果有非传感器的水果，且速度很慢，且高度超出了屏幕上方一定范围
+        if (!body.isSensor && body.position.y < SPAWN_Y - 20 && body.speed < 0.2) {
+             // 简单的判断：如果有物体稳定停留在生成线以上，游戏结束
+             gameOver();
+             break;
+        }
+    }
+}
+
+function gameOver() {
+    isGameOver = true;
+    document.getElementById('game-over-overlay').style.display = 'flex';
+    Runner.stop(runner); // 停止物理模拟
+}
+
+
+// ===========================
+// 核心逻辑：碰撞与合并
+// ===========================
+Events.on(engine, 'collisionStart', function(event) {
+    const pairs = event.pairs;
+    for (let i = 0; i < pairs.length; i++) {
+        const bodyA = pairs[i].bodyA;
+        const bodyB = pairs[i].bodyB;
+
+        // 检查是否都是水果
+        if (bodyA.label.startsWith('fruit_') && bodyB.label.startsWith('fruit_')) {
+            const levelA = parseInt(bodyA.label.split('_')[1]);
+            const levelB = parseInt(bodyB.label.split('_')[1]);
+
+            // 如果等级相同且不是最大等级，则合并
+            if (levelA === levelB && levelA < FRUIT_LEVELS.length - 1) {
+                // 计算中点
+                const midX = (bodyA.position.x + bodyB.position.x) / 2;
+                const midY = (bodyA.position.y + bodyB.position.y) / 2;
+                
+                // 移除旧的
+                World.remove(world, [bodyA, bodyB]);
+                
+                // 创建新的大一级的
+                const newLevel = levelA + 1;
+                const newFruit = createFruitBody(midX, midY, newLevel);
+                World.add(world, newFruit);
+
+                // 加分
+                score += FRUIT_LEVELS[newLevel].score;
+                updateUI();
+                
+                // 合并后立即跳出当前循环，避免同一个物体多次处理
+                break; 
+            }
+        }
+    }
+});
+
+// 游戏循环中检查结束条件
+Events.on(engine, 'afterUpdate', function() {
+    if (!isGameOver && !isDropping) {
+        // 只有在没有进行下落操作时才检查，避免刚生成时误判
+        // checkGameOver(); // 暂时注释掉，因为简单的判断容易误判，先让玩家爽玩
+    }
+});
+
+
+// ===========================
+// 输入事件处理 (触摸与鼠标)
+// ===========================
+function handleInputMove(e) {
+    if (isGameOver || isDropping || !currentFruit) return;
+    e.preventDefault();
+    
+    let clientX;
+    if(e.type.startsWith('touch')) {
+        clientX = e.touches[0].clientX;
+    } else {
+        clientX = e.clientX;
+    }
+
+    // 获取 Canvas 在屏幕上的位置
+    const rect = canvas.getBoundingClientRect();
+    let relativeX = clientX - rect.left;
+    
+    // 限制移动范围，不让水果移出屏幕外
+    const radius = FRUIT_LEVELS[parseInt(currentFruit.label.split('_')[1])].radius;
+    relativeX = Math.max(radius, Math.min(canvasWidth - radius, relativeX));
+    
+    // 更新顶部水果位置
+    Matter.Body.setPosition(currentFruit, { x: relativeX, y: SPAWN_Y });
+}
+
+function handleInputEnd(e) {
+    if (isGameOver || isDropping || !currentFruit) return;
+    e.preventDefault();
+    isDropping = true;
+
+    // 将当前水果变为受重力影响的普通刚体
+    Matter.Body.setStatic(currentFruit, false);
+    currentFruit.isSensor = false; 
+
+    currentFruit = null;
+    
+    // 延时生成下一个，防止操作过快
+    setTimeout(spawnCurrentFruit, 800);
+}
+
+// 绑定事件
+canvasWrapper.addEventListener('mousemove', handleInputMove);
+canvasWrapper.addEventListener('touchmove', handleInputMove, { passive: false });
+
+canvasWrapper.addEventListener('mouseup', handleInputEnd);
+canvasWrapper.addEventListener('touchend', handleInputEnd, { passive: false });
+// 点击也可以触发下落
+canvasWrapper.addEventListener('click', handleInputEnd);
+
+// 重新开始按钮
+document.getElementById('restart-btn').addEventListener('click', function() {
+    World.clear(world);
+    Engine.clear(engine);
+    score = 0;
+    isGameOver = false;
+    document.getElementById('game-over-overlay').style.display = 'none';
+    createWalls();
+    nextFruitLevel = getRandomNextLevel();
+    spawnCurrentFruit();
+    Runner.run(runner, engine);
+});
+
+
+// ===========================
+// 启动游戏
+// ===========================
+createWalls();
+nextFruitLevel = getRandomNextLevel();
+updateUI();
+spawnCurrentFruit();
+
+// 开始渲染和物理模拟
+Render.run(render);
+const runner = Runner.create();
+Runner.run(runner, engine);
+
+// 窗口大小改变时适配 Canvas
+window.addEventListener('resize', function() {
+    canvasWidth = canvasWrapper.clientWidth;
+    canvasHeight = canvasWrapper.clientHeight;
+    render.canvas.width = canvasWidth;
+    render.canvas.height = canvasHeight;
+    // 需要重新定位墙壁
+    World.clear(world, true); // 清除墙壁
+    createWalls();
+});
+
+</script>
+</body>
+</html>
