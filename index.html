@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>合成崔梓璇</title>
+    <link rel="icon" href="images/崔梓璇01.gif" type="image/gif">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* CSS reset 和基础样式 */
@@ -447,8 +448,37 @@
             return Bodies.circle(x, y, levelData.radius, options);
         }
 
+        /**
+         * 2. 根据分数调整下一个掉落的等级范围
+         */
         function getRandomNextLevel() {
-            return Math.floor(Math.random() * 5);
+            let minLevel = 0;
+            let maxLevel = 5; // 随机范围的上限（不包括），即 [0, 4]
+
+            // 规则 1: 2500分以上，最小等级为 1
+            if (score >= 2500) {
+                minLevel = 1;
+                maxLevel = 6;
+            }
+
+            // 规则 2: 5000分以上，最小等级为 2
+            if (score >= 5000) {
+                minLevel = 2;
+                maxLevel = 7;
+            }
+
+            // 确保最小等级不会超过最大范围
+            minLevel = Math.min(minLevel, maxLevel - 1);
+
+            const rangeSize = maxLevel - minLevel;
+
+            if (rangeSize <= 0) {
+                // 如果分数太高，可能需要调整 maxLevel 或确保游戏结束
+                return minLevel;
+            }
+
+            // 在 [minLevel, maxLevel - 1] 范围内随机生成一个整数
+            return Math.floor(Math.random() * rangeSize) + minLevel;
         }
 
         function updateUI() {
@@ -674,9 +704,11 @@
             currentFruit.isSensor = false;
             currentFruit = null;
 
+            // 稍微延长下一次掉落时间，给合并留出空间
             setTimeout(spawnCurrentFruit, 600);
         }
 
+        // 绑定输入事件
         canvasWrapper.addEventListener('mousemove', handleInputMove);
         canvasWrapper.addEventListener('touchmove', handleInputMove, {
             passive: false
@@ -685,18 +717,31 @@
         canvasWrapper.addEventListener('touchend', handleInputEnd, {
             passive: false
         });
-        canvasWrapper.addEventListener('click', handleInputEnd);
+        // 确保点击也能触发，特别是移动端
+        canvasWrapper.addEventListener('click', function(e) {
+            // 确保不是拖动事件的残留
+            if (!isDropping) {
+                handleInputEnd(e);
+            }
+        });
 
         document.getElementById('restart-btn').addEventListener('click', function() {
             // 停止运行
             Runner.stop(runner);
 
-            World.clear(world);
+            // 清理 Matter.js 世界中的所有物体
+            World.clear(world, true);
             Engine.clear(engine);
+
+            // 重置状态
             score = 0;
             isGameOver = false;
             document.getElementById('game-over-overlay').style.display = 'none';
+
+            // 重新设置墙壁
             createWalls();
+
+            // 重新开始游戏
             nextFruitLevel = getRandomNextLevel();
             spawnCurrentFruit();
 
@@ -725,6 +770,7 @@
             canvasHeight = canvasWrapper.clientHeight;
             render.canvas.width = canvasWidth;
             render.canvas.height = canvasHeight;
+            // 重建墙壁
             World.clear(world, true);
             createWalls();
         });
