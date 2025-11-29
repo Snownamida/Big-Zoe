@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>弹射崔梓璇</title>
+    <link rel="icon" href="images/崔梓璇01.gif" type="image/gif">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        /* CSS reset 和基础样式 */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #ffe4e1;
+            font-family: 'Arial', sans-serif;
+            background-image: radial-gradient(circle at 50% 30%, #fff0f5 0%, #ffe4e1 80%);
+        }
+        /* 游戏主容器 */
+        
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            max-width: 800px;
+            margin: 0 auto;
+            background: transparent;
+        }
+        /* 顶部导航栏 (修改为链接到原版游戏) */
+        
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #d63384;
+            background: rgba(255, 255, 255, 0.5);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.8);
+        }
+        
+        .header-bar a {
+            text-decoration: none;
+        }
+        
+        .header-bar button {
+            background: #ff69b4;
+            color: white;
+            border: 2px solid #fff;
+            border-radius: 15px;
+            padding: 5px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(214, 51, 132, 0.2);
+        }
+        /* 游戏UI栏 (分数和剩余弹药) */
+        
+        .game-ui-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            /* 居中对齐 */
+            padding: 10px 20px;
+            color: #d63384;
+            z-index: 10;
+        }
+        
+        .score-box,
+        .ammo-box {
+            font-size: 20px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+        
+        .ammo-box {
+            font-size: 16px;
+        }
+        /* Canvas 画布容器 */
+        
+        #canvas-wrapper {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            margin-bottom: 10px;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-top: none;
+            /* 移除顶部边框 */
+        }
+        /* 实际的游戏画布 */
+        
+        #world {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* 游戏结束/关卡结束 遮罩 */
+        
+        #end-level-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            color: #d63384;
+            display: none;
+            /* 默认隐藏 */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            text-align: center;
+        }
+        
+        #end-level-overlay h2 {
+            font-size: 32px;
+            margin-bottom: 15px;
+        }
+        
+        #end-level-overlay p {
+            font-size: 18px;
+            margin-bottom: 25px;
+        }
+        
+        #end-level-btn {
+            padding: 12px 30px;
+            font-size: 20px;
+            background: #d63384;
+            border: none;
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(214, 51, 132, 0.4);
+            transition: transform 0.1s;
+        }
+        
+        #end-level-btn:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <div class="header-bar">
+            <div>弹射崔梓璇</div>
+            <a href="suika.html"> <button>去玩合成崔梓璇 👉</button>
+            </a>
+        </div>
+
+        <div class="game-ui-bar">
+            <div class="score-box">分数: <span id="score">0</span></div>
+            <div class="ammo-box">关卡: <span id="level">1</span></div>
+            <div class="ammo-box">剩余: <span id="ammo">0</span></div>
+        </div>
+
+        <div id="canvas-wrapper">
+            <canvas id="world"></canvas>
+            <div id="end-level-overlay">
+                <h2 id="end-level-title">关卡完成!</h2>
+                <p id="end-level-score">你的分数: 0</p>
+                <button id="end-level-btn">下一关</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // ===========================
+        // 游戏配置与素材定义
+        // ===========================
+
+        const IMG_PATH = 'images/';
+
+        // 定义 11 个等级的属性 (原版素材)
+        // 我们将用 0 作为 projectile, 1-10 作为 targets
+        const FRUIT_LEVELS = [{
+                radius: 18,
+                fileName: '崔梓璇01.gif',
+                score: 100, // 击中基础分
+                mass: 1.5,
+                backgroundColor: '#FFFACD',
+                borderColor: '#FFD700'
+            }, // 0: Projectile
+            {
+                radius: 24,
+                fileName: '崔梓璇02.gif',
+                score: 500,
+                mass: 1,
+                backgroundColor: '#FFA07A',
+                borderColor: '#FF4500'
+            }, // 1: Target 1
+            {
+                radius: 30,
+                fileName: '崔梓璇03.gif',
+                score: 800,
+                mass: 1.5,
+                backgroundColor: '#FF6347',
+                borderColor: '#DC143C'
+            }, // 2: Target 2
+            {
+                radius: 34,
+                fileName: '崔梓璇04.gif',
+                score: 1000,
+                mass: 2,
+                backgroundColor: '#90EE90',
+                borderColor: '#3CB371'
+            }, // 3
+            {
+                radius: 42,
+                fileName: '崔梓璇05.gif',
+                score: 1500,
+                mass: 2.5,
+                backgroundColor: '#32CD32',
+                borderColor: '#228B22'
+            }, // 4
+            {
+                radius: 52,
+                fileName: '崔梓璇06.gif',
+                score: 2000,
+                mass: 3,
+                backgroundColor: '#87CEFA',
+                borderColor: '#4682B4'
+            }, // 5
+            {
+                radius: 64,
+                fileName: '崔梓璇07.gif',
+                score: 2500,
+                mass: 4,
+                backgroundColor: '#4169E1',
+                borderColor: '#191970'
+            }, // 6
+            {
+                radius: 76,
+                fileName: '崔梓璇08.gif',
+                score: 3000,
+                mass: 5,
+                backgroundColor: '#9932CC',
+                borderColor: '#800080'
+            }, // 7
+            {
+                radius: 88,
+                fileName: '崔梓璇09.gif',
+                score: 4000,
+                mass: 6,
+                backgroundColor: '#FFD700',
+                borderColor: '#B8860B'
+            }, // 8
+            {
+                radius: 100,
+                fileName: '崔梓璇10.gif',
+                score: 5000,
+                mass: 8,
+                backgroundColor: '#C0C0C0',
+                borderColor: '#808080'
+            }, // 9
+            {
+                radius: 115,
+                fileName: '崔梓璇11.png',
+                score: 10000,
+                mass: 15,
+                backgroundColor: '#228B22',
+                borderColor: '#3CB371'
+            } // 10: "Boss" Target
+        ];
+
+        // 预加载系统 (复用原版)
+        const textureCache = [];
+
+        function preloadImages() {
+            let loadedCount = 0;
+            const totalCount = FRUIT_LEVELS.length;
+            return new Promise((resolve) => {
+                FRUIT_LEVELS.forEach((level, index) => {
+                    const img = new Image();
+                    const url = IMG_PATH + level.fileName;
+
+                    textureCache[index] = {
+                        url: url,
+                        scale: 1,
+                        loaded: false,
+                        imgObject: img
+                    };
+
+                    img.onload = function() {
+                        const diameter = level.radius * 2;
+                        textureCache[index].scale = diameter / img.width;
+                        textureCache[index].loaded = true;
+                        loadedCount++;
+                        if (loadedCount === totalCount) {
+                            resolve();
+                        }
+                    };
+                    img.onerror = function() {
+                        console.error("加载图片失败:", url);
+                        textureCache[index].loaded = false; // 标记为未加载
+                        loadedCount++;
+                        if (loadedCount === totalCount) {
+                            resolve(); // 即使失败也继续
+                        }
+                    };
+                    img.src = url;
+                });
+            });
+        }
+
+
+        // ===========================
+        // Matter.js 初始化
+        // ===========================
+        const {
+            Engine,
+            Render,
+            Runner,
+            Bodies,
+            World,
+            Events,
+            Composite,
+            Constraint,
+            Mouse,
+            MouseConstraint
+        } = Matter;
+
+        const engine = Engine.create();
+        const world = engine.world;
+        engine.world.gravity.y = 1; // 标准重力
+
+        const canvas = document.getElementById('world');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        let canvasWidth = canvasWrapper.clientWidth;
+        let canvasHeight = canvasWrapper.clientHeight;
+
+        const render = Render.create({
+            canvas: canvas,
+            engine: engine,
+            options: {
+                width: canvasWidth,
+                height: canvasHeight,
+                wireframes: false,
+                background: 'transparent',
+                pixelRatio: window.devicePixelRatio
+            }
+        });
+        const context = render.context;
+        let runner;
+
+        // ===========================
+        // 关卡定义
+        // ===========================
+        const LEVELS = [
+            // 关卡 1
+            {
+                ammo: 3,
+                targets: [{
+                        x: 0.7,
+                        y: 0.8,
+                        level: 1
+                    }, // level 1 = 崔梓璇02.gif
+                ],
+                blocks: [{
+                    x: 0.7,
+                    y: 0.9,
+                    w: 100,
+                    h: 20
+                }, ]
+            },
+            // 关卡 2
+            {
+                ammo: 4,
+                targets: [{
+                        x: 0.65,
+                        y: 0.8,
+                        level: 1
+                    }, {
+                        x: 0.75,
+                        y: 0.8,
+                        level: 2
+                    }, // level 2 = 崔梓璇03.gif
+                ],
+                blocks: [{
+                    x: 0.7,
+                    y: 0.9,
+                    w: 150,
+                    h: 20
+                }, {
+                    x: 0.7,
+                    y: 0.7,
+                    w: 150,
+                    h: 20
+                }, ]
+            },
+            // 关卡 3
+            {
+                ammo: 5,
+                targets: [{
+                        x: 0.7,
+                        y: 0.5,
+                        level: 3
+                    }, // level 3 = 崔梓璇04.gif
+                    {
+                        x: 0.6,
+                        y: 0.8,
+                        level: 1
+                    }, {
+                        x: 0.8,
+                        y: 0.8,
+                        level: 1
+                    },
+                ],
+                blocks: [{
+                    x: 0.7,
+                    y: 0.9,
+                    w: 250,
+                    h: 20
+                }, {
+                    x: 0.6,
+                    y: 0.7,
+                    w: 80,
+                    h: 20
+                }, {
+                    x: 0.8,
+                    y: 0.7,
+                    w: 80,
+                    h: 20
+                }, {
+                    x: 0.7,
+                    y: 0.6,
+                    w: 80,
+                    h: 20
+                }, ]
+            },
+            // 关卡 4
+            {
+                ammo: 3,
+                targets: [{
+                        x: 0.75,
+                        y: 0.8,
+                        level: 10
+                    }, // level 10 = 崔梓璇11.png (Boss)
+                ],
+                blocks: [{
+                    x: 0.75,
+                    y: 0.9,
+                    w: 250,
+                    h: 20
+                }, ]
+            },
+        ];
+
+        // ===========================
+        // 游戏状态变量
+        // ===========================
+        let currentProjectile = null;
+        let slingshotConstraint = null;
+        let score = 0;
+        let currentLevelIndex = 0;
+        let ammo = 0;
+        let isAiming = false;
+        let isGameOver = false;
+        let projectileLaunched = false;
+        const scoredTargets = new Set(); // 存储已计分的 target ID
+
+        // 弹弓位置 (相对于画布百分比)
+        const SLINGSHOT_POS = {
+            x: 0.2,
+            y: 0.75
+        };
+        let slingshotX, slingshotY;
+
+        // ===========================
+        // 游戏辅助函数
+        // ===========================
+
+        function updateSlingshotPosition() {
+            slingshotX = canvasWidth * SLINGSHOT_POS.x;
+            slingshotY = canvasHeight * SLINGSHOT_POS.y;
+        }
+
+        function createWalls() {
+            const wallThickness = 100;
+            const ground = Bodies.rectangle(canvasWidth / 2, canvasHeight + wallThickness / 2, canvasWidth, wallThickness, {
+                isStatic: true,
+                label: 'ground',
+                render: {
+                    fillStyle: '#E0BBE4'
+                } // 可见地面
+            });
+            const leftWall = Bodies.rectangle(-wallThickness / 2, canvasHeight / 2, wallThickness, canvasHeight * 2, {
+                isStatic: true,
+                label: 'wall_left',
+                render: {
+                    visible: false
+                }
+            });
+            const rightWall = Bodies.rectangle(canvasWidth + wallThickness / 2, canvasHeight / 2, wallThickness, canvasHeight * 2, {
+                isStatic: true,
+                label: 'wall_right',
+                render: {
+                    visible: false
+                }
+            });
+            World.add(world, [ground, leftWall, rightWall]);
+        }
+
+        /**
+         * 创建崔梓璇刚体 (复用并修改)
+         */
+        function createFruitBody(x, y, levelIndex, label) {
+            const levelData = FRUIT_LEVELS[levelIndex];
+            const textureData = textureCache[levelIndex];
+
+            const customRender = {
+                level: levelIndex,
+                texture: textureData,
+                backgroundColor: levelData.backgroundColor,
+                borderColor: levelData.borderColor,
+                radius: levelData.radius,
+                score: levelData.score // 附加分数
+            };
+
+            const options = {
+                restitution: 0.4,
+                friction: 0.1,
+                density: levelData.mass / (levelData.radius * levelData.radius), // 根据质量和半径计算密度
+                label: label,
+                render: {
+                    visible: false
+                }, // 禁用默认渲染
+                customRender: customRender
+            };
+
+            return Bodies.circle(x, y, levelData.radius, options);
+        }
+
+        /**
+         * 创建障碍物
+         */
+        function createBlock(x, y, w, h) {
+            return Bodies.rectangle(x, y, w, h, {
+                friction: 0.4,
+                restitution: 0.2,
+                density: 0.005,
+                label: 'block',
+                render: {
+                    visible: false
+                }, // 禁用默认渲染
+                customRender: { // 自定义渲染属性
+                    width: w,
+                    height: h,
+                    color: '#8B4513' // 棕色
+                }
+            });
+        }
+
+        function updateUI() {
+            document.getElementById('score').innerText = score;
+            document.getElementById('level').innerText = currentLevelIndex + 1;
+            document.getElementById('ammo').innerText = ammo;
+        }
+
+        /**
+         * 加载新关卡
+         */
+        function setupLevel(levelIndex) {
+            isGameOver = false;
+            projectileLaunched = false;
+            scoredTargets.clear();
+            World.clear(world, false); // 清理刚体，保留约束 (虽然这里也清了)
+            Engine.clear(engine);
+
+            createWalls();
+            updateSlingshotPosition();
+
+            const level = LEVELS[levelIndex];
+            if (!level) {
+                showEndScreen(true, true); // 所有关卡完成
+                return;
+            }
+
+            ammo = level.ammo;
+
+            // 添加 targets
+            level.targets.forEach(t => {
+                const x = t.x * canvasWidth;
+                const y = t.y * canvasHeight;
+                World.add(world, createFruitBody(x, y, t.level, 'target_' + t.level));
+            });
+
+            // 添加 blocks
+            level.blocks.forEach(b => {
+                const x = b.x * canvasWidth;
+                const y = b.y * canvasHeight;
+                World.add(world, createBlock(x, y, b.w, b.h));
+            });
+
+            updateUI();
+            spawnProjectile();
+        }
+
+        /**
+         * 生成待发射的弹丸
+         */
+        function spawnProjectile() {
+            if (ammo <= 0 || isGameOver) return;
+            ammo--;
+            updateUI();
+
+            projectileLaunched = false;
+            currentProjectile = createFruitBody(slingshotX, slingshotY, 0, 'projectile_0'); // 0级 = 崔梓璇01
+
+            slingshotConstraint = Constraint.create({
+                pointA: {
+                    x: slingshotX,
+                    y: slingshotY
+                },
+                bodyB: currentProjectile,
+                stiffness: 0.05,
+                damping: 0.01,
+                render: {
+                    visible: false
+                } // 我们将自定义绘制弹弓
+            });
+
+            World.add(world, [currentProjectile, slingshotConstraint]);
+        }
+
+        /**
+         * 显示结束画面 (游戏结束或关卡胜利)
+         */
+        function showEndScreen(isWin, isAllLevelsComplete = false) {
+            isGameOver = true;
+            const overlay = document.getElementById('end-level-overlay');
+            const title = document.getElementById('end-level-title');
+            const scoreText = document.getElementById('end-level-score');
+            const button = document.getElementById('end-level-btn');
+
+            if (isAllLevelsComplete) {
+                title.innerText = "恭喜通关!";
+                scoreText.innerText = "总分数: " + score;
+                button.innerText = "重新开始";
+            } else if (isWin) {
+                title.innerText = "关卡完成!";
+                scoreText.innerText = "当前分数: " + score;
+                button.innerText = "下一关";
+            } else {
+                title.innerText = "游戏结束";
+                scoreText.innerText = "当前分数: " + score;
+                button.innerText = "再试一次";
+            }
+
+            overlay.style.display = 'flex';
+        }
+
+        /**
+         * 检查胜利或失败条件
+         */
+        function checkWinLoss() {
+            // 检查是否还有 targets
+            const targets = Composite.allBodies(world).filter(b => b.label.startsWith('target_'));
+
+            if (targets.length === 0) {
+                // 胜利
+                showEndScreen(true);
+            } else if (ammo === 0) {
+                // 失败
+                showEndScreen(false);
+            } else {
+                // 继续
+                setTimeout(spawnProjectile, 1000); // 1秒后生成下一个
+            }
+        }
+
+        // ===========================
+        // 自定义渲染函数 (圆形裁剪的关键)
+        // ===========================
+        function customRenderBodies() {
+            const bodies = Composite.allBodies(world);
+
+            // 绘制弹弓
+            context.save();
+            // 绘制弹弓底座
+            context.beginPath();
+            context.arc(slingshotX, slingshotY + 10, 15, 0, 2 * Math.PI);
+            context.fillStyle = 'rgba(139, 69, 19, 0.7)'; // 棕色
+            context.fill();
+            context.lineWidth = 3;
+            context.strokeStyle = '#654321';
+            context.stroke();
+
+            // 绘制弹弓皮筋
+            if (isAiming && currentProjectile) {
+                context.beginPath();
+                context.moveTo(slingshotX - 10, slingshotY); // 左支点
+                context.lineTo(currentProjectile.position.x, currentProjectile.position.y);
+                context.moveTo(slingshotX + 10, slingshotY); // 右支点
+                context.lineTo(currentProjectile.position.x, currentProjectile.position.y);
+                context.strokeStyle = '#333';
+                context.lineWidth = 4;
+                context.stroke();
+            }
+            context.restore();
+
+
+            // 遍历所有刚体
+            bodies.forEach(body => {
+                context.save();
+                context.translate(body.position.x, body.position.y);
+                context.rotate(body.angle);
+
+                if (body.label.startsWith('fruit_') || body.label.startsWith('projectile_') || body.label.startsWith('target_')) {
+                    // --- 绘制 崔梓璇 (圆形) ---
+                    const {
+                        texture,
+                        backgroundColor,
+                        borderColor,
+                        radius
+                    } = body.customRender;
+
+                    context.beginPath();
+                    context.arc(0, 0, radius, 0, 2 * Math.PI);
+                    context.fillStyle = backgroundColor;
+                    context.fill();
+                    context.lineWidth = 3;
+                    context.strokeStyle = borderColor;
+                    context.stroke();
+
+                    if (texture && texture.loaded) {
+                        context.clip(); // 应用裁剪
+                        const img = texture.imgObject;
+                        const diameter = radius * 2;
+                        context.drawImage(img, -radius, -radius, diameter, diameter);
+                    }
+                } else if (body.label === 'block') {
+                    // --- 绘制 障碍物 (矩形) ---
+                    const {
+                        width,
+                        height,
+                        color
+                    } = body.customRender;
+                    context.beginPath();
+                    context.rect(-width / 2, -height / 2, width, height);
+                    context.fillStyle = color;
+                    context.fill();
+                    context.lineWidth = 2;
+                    context.strokeStyle = '#654321'; // 深棕色边框
+                    context.stroke();
+                }
+
+                context.restore();
+            });
+        }
+        Events.on(render, 'afterRender', customRenderBodies);
+
+
+        // ===========================
+        // 核心逻辑：碰撞
+        // ===========================
+        Events.on(engine, 'collisionStart', function(event) {
+            if (isGameOver) return;
+            const pairs = event.pairs;
+
+            pairs.forEach(pair => {
+                const {
+                    bodyA,
+                    bodyB
+                } = pair;
+                let target = null;
+                let other = null;
+
+                if (bodyA.label.startsWith('target_')) {
+                    target = bodyA;
+                    other = bodyB;
+                } else if (bodyB.label.startsWith('target_')) {
+                    target = bodyB;
+                    other = bodyA;
+                }
+
+                if (target && !scoredTargets.has(target.id)) {
+                    // 只要 target 被撞了 (无论是被弹丸、方块还是地面)
+                    const impulse = pair.collision.impulse.x + pair.collision.impulse.y;
+
+                    // 只有一定力度的撞击才计分和移除
+                    if (impulse > 1.5 || other.label.startsWith('projectile_')) {
+                        // 播放音效或动画的地方
+
+                        // 计分
+                        score += target.customRender.score;
+                        scoredTargets.add(target.id);
+                        updateUI();
+
+                        // 延迟移除，给玩家一个视觉反馈
+                        setTimeout(() => {
+                            // 检查刚体是否还存在 (防止重复移除)
+                            if (Composite.get(world, target.id, 'body')) {
+                                World.remove(world, target);
+                            }
+                        }, 100);
+                    }
+                }
+            });
+        });
+
+        // ===========================
+        // 核心逻辑：游戏循环
+        // ===========================
+        Events.on(engine, 'afterUpdate', function() {
+            if (isGameOver) return;
+
+            // 检查弹丸是否已停止
+            if (projectileLaunched && currentProjectile) {
+                const isOffScreen = currentProjectile.position.y > canvasHeight + 50 ||
+                    currentProjectile.position.x < -50 ||
+                    currentProjectile.position.x > canvasWidth + 50;
+
+                const isResting = currentProjectile.speed < 0.5 && currentProjectile.angularSpeed < 0.1;
+
+                // 在静止 1.5 秒后或飞出屏幕后，检查胜负
+                if (isOffScreen || (isResting && !currentProjectile.restingTimer)) {
+                    currentProjectile.restingTimer = Date.now();
+                } else if (isResting && (Date.now() - currentProjectile.restingTimer > 1500)) {
+                    World.remove(world, currentProjectile);
+                    currentProjectile = null;
+                    projectileLaunched = false;
+                    checkWinLoss();
+                }
+            }
+        });
+
+
+        // ===========================
+        // 输入事件处理 (鼠标与触摸)
+        // ===========================
+        const mouse = Mouse.create(render.canvas);
+        const mouseConstraint = MouseConstraint.create(engine, {
+            mouse: mouse,
+            constraint: {
+                stiffness: 0.2,
+                render: {
+                    visible: false
+                }
+            }
+        });
+
+        Events.on(mouseConstraint, 'startdrag', (e) => {
+            if (e.body === currentProjectile) {
+                isAiming = true;
+            }
+        });
+
+        Events.on(mouseConstraint, 'enddrag', (e) => {
+            if (e.body === currentProjectile && isAiming) {
+                isAiming = false;
+                projectileLaunched = true;
+                if (slingshotConstraint) {
+                    World.remove(world, slingshotConstraint);
+                    slingshotConstraint = null;
+                }
+            }
+        });
+
+        Events.on(mouseConstraint, 'mousemove', (e) => {
+            if (isAiming && currentProjectile) {
+                // 限制拖拽距离
+                const dx = e.mouse.position.x - slingshotX;
+                const dy = e.mouse.position.y - slingshotY;
+                const maxDist = 100;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist > maxDist) {
+                    const ratio = maxDist / dist;
+                    Matter.Body.setPosition(currentProjectile, {
+                        x: slingshotX + dx * ratio,
+                        y: slingshotY + dy * ratio
+                    });
+                }
+            }
+        });
+
+        World.add(world, mouseConstraint);
+        render.mouse = mouse; // 确保渲染器知道鼠标
+
+        // 结束画面按钮
+        document.getElementById('end-level-btn').addEventListener('click', function() {
+            const overlay = document.getElementById('end-level-overlay');
+            overlay.style.display = 'none';
+
+            if (this.innerText === "下一关") {
+                currentLevelIndex++;
+                setupLevel(currentLevelIndex);
+            } else if (this.innerText === "再试一次") {
+                setupLevel(currentLevelIndex);
+            } else if (this.innerText === "重新开始") {
+                currentLevelIndex = 0;
+                score = 0;
+                setupLevel(currentLevelIndex);
+            }
+        });
+
+
+        // ===========================
+        // 启动游戏
+        // ===========================
+        function initGame() {
+            // 确保 DOM 加载完成
+            canvasWidth = canvasWrapper.clientWidth;
+            canvasHeight = canvasWrapper.clientHeight;
+            render.canvas.width = canvasWidth;
+            render.canvas.height = canvasHeight;
+            render.options.width = canvasWidth;
+            render.options.height = canvasHeight;
+
+            score = 0;
+            currentLevelIndex = 0;
+
+            setupLevel(currentLevelIndex);
+
+            Render.run(render);
+            runner = Runner.create();
+            Runner.run(runner, engine);
+        }
+
+        // 预加载图片，然后启动游戏
+        preloadImages().then(() => {
+            // 确保在 DOM 完全加载后再初始化
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initGame);
+            } else {
+                initGame();
+            }
+        });
+
+        // 窗口大小调整
+        window.addEventListener('resize', function() {
+            canvasWidth = canvasWrapper.clientWidth;
+            canvasHeight = canvasWrapper.clientHeight;
+            render.canvas.width = canvasWidth;
+            render.canvas.height = canvasHeight;
+            render.options.width = canvasWidth;
+            render.options.height = canvasHeight;
+
+            // 重新设置墙壁和弹弓位置并重载关卡
+            console.log("Resizing... reloading level.");
+            setupLevel(currentLevelIndex);
+        });
+    </script>
+</body>
+
+</html>
