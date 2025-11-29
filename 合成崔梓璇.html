@@ -207,98 +207,109 @@
         // 游戏配置与素材定义
         // ===========================
 
-        // 基础路径 - 确保 HTML 文件和 images 文件夹在同一级目录
         const IMG_PATH = 'images/';
 
-        // 定义 11 个等级的属性
-        // radius: 物理碰撞半径 (px)
-        // fileName: 对应的文件名
-        // score: 合成得分
+        // 定义 11 个等级的属性，新增 backgroundColor 和 borderColor
         const FRUIT_LEVELS = [{
                 radius: 18,
                 fileName: '崔梓璇01.gif',
-                score: 2
+                score: 2,
+                backgroundColor: '#FFB6C1',
+                borderColor: '#F08080'
             }, // 0
             {
                 radius: 26,
                 fileName: '崔梓璇02.gif',
-                score: 4
+                score: 4,
+                backgroundColor: '#FF69B4',
+                borderColor: '#FF1493'
             }, // 1
             {
                 radius: 34,
                 fileName: '崔梓璇03.gif',
-                score: 8
+                score: 8,
+                backgroundColor: '#FF1493',
+                borderColor: '#C71585'
             }, // 2
             {
                 radius: 42,
                 fileName: '崔梓璇04.gif',
-                score: 16
+                score: 16,
+                backgroundColor: '#DB7093',
+                borderColor: '#CD5C5C'
             }, // 3
             {
                 radius: 52,
                 fileName: '崔梓璇05.gif',
-                score: 32
+                score: 32,
+                backgroundColor: '#C71585',
+                borderColor: '#8B008B'
             }, // 4
             {
                 radius: 64,
                 fileName: '崔梓璇06.gif',
-                score: 64
+                score: 64,
+                backgroundColor: '#8B008B',
+                borderColor: '#4B0082'
             }, // 5
             {
                 radius: 76,
                 fileName: '崔梓璇07.gif',
-                score: 128
+                score: 128,
+                backgroundColor: '#9400D3',
+                borderColor: '#8A2BE2'
             }, // 6
             {
                 radius: 88,
                 fileName: '崔梓璇08.gif',
-                score: 256
+                score: 256,
+                backgroundColor: '#9932CC',
+                borderColor: '#BA55D3'
             }, // 7
             {
                 radius: 100,
                 fileName: '崔梓璇09.gif',
-                score: 512
+                score: 512,
+                backgroundColor: '#BA55D3',
+                borderColor: '#DA70D6'
             }, // 8
             {
                 radius: 115,
                 fileName: '崔梓璇10.gif',
-                score: 1024
+                score: 1024,
+                backgroundColor: '#DA70D6',
+                borderColor: '#D8BFD8'
             }, // 9
             {
                 radius: 135,
                 fileName: '崔梓璇11.png',
-                score: 2048
+                score: 2048,
+                backgroundColor: '#228B22',
+                borderColor: '#3CB371'
             } // 10: 终极
         ];
 
         // 预加载系统
-        // 我们需要加载图片以获取其原始尺寸，从而计算缩放比例(scale)，
-        // 这样无论原图多大，都能完美缩放到 radius 大小。
         const textureCache = []; // 存储 { url, scaleX, scaleY, loaded }
-        const fallbackColors = ['#FFB6C1', '#FF69B4', '#FF1493', '#DB7093', '#C71585', '#8B008B', '#9400D3', '#9932CC', '#BA55D3', '#DA70D6', '#228B22'];
 
         function preloadImages() {
             FRUIT_LEVELS.forEach((level, index) => {
                 const img = new Image();
                 const url = IMG_PATH + level.fileName;
 
-                // 初始化缓存对象
                 textureCache[index] = {
                     url: url,
-                    scale: 1, // 默认缩放
+                    scale: 1,
                     loaded: false
                 };
 
                 img.onload = function() {
-                    // 计算缩放比例：目标直径 / 图片原始宽度
-                    // 我们假设图片是正方形或者接近正方形，基于宽度进行缩放
                     const diameter = level.radius * 2;
-                    const scale = diameter / img.width;
+                    const scale = diameter / img.width; // 假设图片宽度与高度大致相同
 
                     textureCache[index].scale = scale;
                     textureCache[index].loaded = true;
 
-                    // 如果第一张图加载完了，刷新一下UI预览
                     if (index === nextFruitLevel) {
                         updateUI();
                     }
@@ -306,14 +317,16 @@
 
                 img.onerror = function() {
                     console.error("加载图片失败:", url);
-                    // 加载失败保持 loaded = false，生成物体时会使用颜色回退
+                    textureCache[index].loaded = false; // 标记为加载失败
+                    if (index === nextFruitLevel) { // 如果是当前下一个球，更新UI显示
+                        updateUI();
+                    }
                 };
 
                 img.src = url;
             });
         }
 
-        // 立即开始预加载
         preloadImages();
 
 
@@ -342,7 +355,7 @@
             options: {
                 width: canvasWidth,
                 height: canvasHeight,
-                wireframes: false, // 必须关闭线框模式才能显示贴图
+                wireframes: false,
                 background: 'transparent',
                 pixelRatio: window.devicePixelRatio
             }
@@ -362,7 +375,6 @@
         // 游戏辅助函数
         // ===========================
 
-        // 创建边界墙壁
         function createWalls() {
             const wallThickness = 60;
             const ground = Bodies.rectangle(canvasWidth / 2, canvasHeight + wallThickness / 2, canvasWidth + wallThickness * 2, wallThickness, {
@@ -386,7 +398,6 @@
             World.add(world, [ground, leftWall, rightWall]);
         }
 
-        // 创建一个水果刚体
         function createFruitBody(x, y, levelIndex, isSensor = false) {
             const levelData = FRUIT_LEVELS[levelIndex];
             const textureData = textureCache[levelIndex];
@@ -396,55 +407,61 @@
                 isStatic: isSensor,
                 restitution: 0.2,
                 friction: 0.1,
-                density: 0.002, // 稍微增加密度让手感更扎实
+                density: 0.002,
                 label: 'fruit_' + levelIndex,
                 render: {
+                    // 如果图片加载成功，使用图片作为 sprite 纹理
                     sprite: {
-                        // 如果图片加载成功，使用图片，否则不设置纹理（Matter.js会显示默认颜色）
-                        texture: textureData && textureData.loaded ? textureData.url : null,
+                        texture: textureData && textureData.loaded ? textureData.url : undefined, // undefined 不会渲染 sprite
                         xScale: textureData && textureData.loaded ? textureData.scale : 1,
                         yScale: textureData && textureData.loaded ? textureData.scale : 1
                     },
-                    // 如果图片没加载出来，设置一个备用颜色
-                    fillStyle: fallbackColors[levelIndex] || '#ccc'
+                    // 始终设置 fillStyle 和 strokeStyle 来绘制圆形背景和边框
+                    fillStyle: levelData.backgroundColor,
+                    strokeStyle: levelData.borderColor,
+                    lineWidth: 3 // 描边宽度
                 }
             };
 
             return Bodies.circle(x, y, levelData.radius, options);
         }
 
-        // 生成下一个随机水果等级 (只生成前5种小水果)
         function getRandomNextLevel() {
             return Math.floor(Math.random() * 5);
         }
 
-        // 更新 UI 显示
         function updateUI() {
             document.getElementById('score').innerText = score;
             const previewContainer = document.getElementById('next-item-preview');
             previewContainer.innerHTML = '';
 
             const textureData = textureCache[nextFruitLevel];
+            const levelData = FRUIT_LEVELS[nextFruitLevel];
+
+            // 设置预览框的背景和描边
+            previewContainer.style.backgroundColor = levelData.backgroundColor;
+            previewContainer.style.borderColor = levelData.borderColor;
 
             if (textureData && textureData.loaded) {
-                // 如果图片已加载，显示图片
                 const img = new Image();
                 img.src = textureData.url;
-                // 限制预览图大小
                 img.style.width = '100%';
                 img.style.height = '100%';
+                img.style.borderRadius = '50%'; // 尝试在UI预览中裁剪为圆形
                 previewContainer.appendChild(img);
-                previewContainer.style.backgroundColor = 'transparent';
+                previewContainer.style.color = 'transparent'; // 如果有图片，文字不可见
             } else {
-                // 如果图片未加载，显示颜色块
-                previewContainer.style.backgroundColor = fallbackColors[nextFruitLevel];
-                previewContainer.innerText = nextFruitLevel + 1; // 显示数字代号
+                // 如果图片未加载，显示等级数字
+                previewContainer.innerText = (nextFruitLevel + 1).toString();
                 previewContainer.style.color = 'white';
                 previewContainer.style.fontWeight = 'bold';
+                previewContainer.style.fontSize = '20px';
+                previewContainer.style.display = 'flex';
+                previewContainer.style.alignItems = 'center';
+                previewContainer.style.justifyContent = 'center';
             }
         }
 
-        // 生成顶部当前等待的水果
         function spawnCurrentFruit() {
             if (isGameOver) return;
             const level = nextFruitLevel;
@@ -456,27 +473,20 @@
             isDropping = false;
         }
 
-        // 游戏结束逻辑
         function gameOver() {
             isGameOver = true;
             document.getElementById('game-over-overlay').style.display = 'flex';
-            // 移除当前的悬停球
             if (currentFruit) World.remove(world, currentFruit);
         }
 
-        // 检查游戏结束
         Events.on(engine, 'afterUpdate', function() {
             if (isGameOver || isDropping) return;
 
-            // 逻辑：如果有“非Sensor(已落地)”的水果，且静止，且位置高于警戒线
             const bodies = Composite.allBodies(world);
             for (let i = 0; i < bodies.length; i++) {
                 const body = bodies[i];
                 if (body.label.startsWith('fruit_') && !body.isSensor) {
-                    // 判定高度：如果球心 y 坐标 < 100 (接近顶部) 且速度极慢
                     if (body.position.y < 80 && body.speed < 0.2) {
-                        // 再给一点缓冲时间确认不是反弹上去的
-                        // 这里简单处理直接判负，实际项目可加计时器
                         gameOver();
                         break;
                     }
@@ -492,7 +502,6 @@
             if (isGameOver) return;
             const pairs = event.pairs;
 
-            // 使用 Set 防止同一帧内同一个物体被多次处理
             const removedBodies = new Set();
 
             for (let i = 0; i < pairs.length; i++) {
@@ -506,22 +515,18 @@
                     const levelB = parseInt(bodyB.label.split('_')[1]);
 
                     if (levelA === levelB && levelA < FRUIT_LEVELS.length - 1) {
-                        // 记录要移除的物体
                         removedBodies.add(bodyA.id);
                         removedBodies.add(bodyB.id);
 
                         const midX = (bodyA.position.x + bodyB.position.x) / 2;
                         const midY = (bodyA.position.y + bodyB.position.y) / 2;
 
-                        // 移除旧的
                         World.remove(world, [bodyA, bodyB]);
 
-                        // 创建新的
                         const newLevel = levelA + 1;
                         const newFruit = createFruitBody(midX, midY, newLevel);
                         World.add(world, newFruit);
 
-                        // 加分
                         score += FRUIT_LEVELS[newLevel].score;
                         document.getElementById('score').innerText = score;
                     }
@@ -547,7 +552,6 @@
             const rect = canvas.getBoundingClientRect();
             let relativeX = clientX - rect.left;
 
-            // 限制移动范围
             const currentLevel = parseInt(currentFruit.label.split('_')[1]);
             const radius = FRUIT_LEVELS[currentLevel].radius;
             relativeX = Math.max(radius, Math.min(canvasWidth - radius, relativeX));
@@ -580,7 +584,6 @@
         });
         canvasWrapper.addEventListener('click', handleInputEnd);
 
-        // 重新开始按钮
         document.getElementById('restart-btn').addEventListener('click', function() {
             World.clear(world);
             Engine.clear(engine);
@@ -597,7 +600,6 @@
         // ===========================
         // 启动游戏
         // ===========================
-        // 稍微延时启动，给图片预加载一点点时间（虽然我们有热加载机制）
         setTimeout(() => {
             createWalls();
             nextFruitLevel = getRandomNextLevel();
@@ -609,7 +611,6 @@
             Runner.run(runner, engine);
         }, 100);
 
-        // 窗口大小适配
         window.addEventListener('resize', function() {
             canvasWidth = canvasWrapper.clientWidth;
             canvasHeight = canvasWrapper.clientHeight;
