@@ -242,6 +242,33 @@ export class GameSynthesis implements GameModule {
         const handleInputEnd = (e: MouseEvent | TouchEvent) => {
             if (this.isGameOver || this.isDropping || !this.currentFruit) return;
             e.preventDefault();
+
+            // Ensure fruit is at the release position (critical for tap-to-drop)
+            let clientX;
+            if (e.type.startsWith('touch')) {
+                const touches = (e as TouchEvent).changedTouches; // Use changedTouches for end event
+                if (touches && touches.length > 0) {
+                     clientX = touches[0].clientX;
+                }
+            } else {
+                clientX = (e as MouseEvent).clientX;
+            }
+
+            if (clientX !== undefined) {
+                 const rect = this.canvas.getBoundingClientRect();
+                 let relativeX = clientX - rect.left;
+                 
+                 // Re-calculate bounds
+                 const currentLevel = parseInt(this.currentFruit.label.split('_')[1]);
+                 const radius = FRUIT_LEVELS[currentLevel].radius;
+                 relativeX = Math.max(radius, Math.min(this.canvasWidth - radius, relativeX));
+                 
+                 Matter.Body.setPosition(this.currentFruit, {
+                     x: relativeX,
+                     y: SPAWN_Y
+                 });
+            }
+
             this.isDropping = true;
 
             Matter.Body.setStatic(this.currentFruit, false);
@@ -253,6 +280,10 @@ export class GameSynthesis implements GameModule {
 
         this.canvasWrapper.addEventListener('mousemove', handleInputMove);
         this.canvasWrapper.addEventListener('touchmove', handleInputMove, { passive: false });
+        // Add immediate position update on touch start and mouse down
+        this.canvasWrapper.addEventListener('touchstart', handleInputMove, { passive: false });
+        this.canvasWrapper.addEventListener('mousedown', handleInputMove);
+
         this.canvasWrapper.addEventListener('mouseup', handleInputEnd);
         this.canvasWrapper.addEventListener('touchend', handleInputEnd, { passive: false });
         
