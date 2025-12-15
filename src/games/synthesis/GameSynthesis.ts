@@ -1,15 +1,17 @@
 import Matter from 'matter-js';
-import { FRUIT_LEVELS, SPAWN_Y } from './constants';
-import { createFruitBody } from './physics/bodies';
-import { createWalls } from './physics/setup';
-import { customRenderBodies } from './rendering/customRender';
-import { textureCache } from './utils/preload';
+import { FRUIT_LEVELS, SPAWN_Y } from '../../constants';
+import { createFruitBody } from '../../physics/bodies';
+import { createWalls } from '../../physics/setup';
+import { customRenderBodies } from '../../rendering/customRender';
+import { textureCache, preloadImages } from '../../utils/preload';
+import { GameModule } from '../../router/types';
 
-export class Game {
+export class GameSynthesis implements GameModule {
     private engine: Matter.Engine;
     private render: Matter.Render;
     private runner: Matter.Runner;
     private canvas: HTMLCanvasElement;
+
     private canvasWrapper: HTMLElement;
     private scoreElement: HTMLElement;
     private nextPreviewElement: HTMLElement;
@@ -28,15 +30,52 @@ export class Game {
         this.engine = Matter.Engine.create({
             gravity: { x: 0, y: 4, scale: 0.001 }
         });
-        this.canvas = document.getElementById('world') as HTMLCanvasElement;
-        this.canvasWrapper = document.getElementById('canvas-wrapper') as HTMLElement;
-        this.scoreElement = document.getElementById('score') as HTMLElement;
-        this.nextPreviewElement = document.getElementById('next-item-preview') as HTMLElement;
-        this.gameOverOverlay = document.getElementById('game-over-overlay') as HTMLElement;
+        
+        // Typescript hack for uninitialized properties that will be set in mount()
+        this.render = null as any; 
+        this.runner = null as any;
+        this.canvas = null as any;
+        this.canvasWrapper = null as any;
+        this.scoreElement = null as any;
+        this.nextPreviewElement = null as any;
+        this.gameOverOverlay = null as any;
+    }
+
+    mount(container: HTMLElement) {
+        // Inject Game HTML
+        container.innerHTML = `
+            <div id="game-container">
+                <div class="game-ui-bar">
+                    <div class="score-box"><span id="score">0</span></div>
+                    <div class="next-box">
+                        <span class="next-label">下一个:</span>
+                        <div id="next-item-preview"></div>
+                    </div>
+                </div>
+                <div id="canvas-wrapper" style="height: 60vh; min-height: 400px; display:flex; flex-direction:column;">
+                    <canvas id="world" style="flex:1; width:100%; height:100%; display:block;"></canvas>
+                    <div id="game-over-overlay">
+                        <h2>游戏结束</h2>
+                        <button id="restart-btn">再来一次</button>
+                    </div>
+                </div>
+                <div class="header-bar" style="margin-top:auto">
+                    <div>合成崔梓璇</div>
+                </div>
+            </div>
+        `;
+
+        // Get Elements
+        this.canvas = container.querySelector('#world') as HTMLCanvasElement;
+        this.canvasWrapper = container.querySelector('#canvas-wrapper') as HTMLElement;
+        this.scoreElement = container.querySelector('#score') as HTMLElement;
+        this.nextPreviewElement = container.querySelector('#next-item-preview') as HTMLElement;
+        this.gameOverOverlay = container.querySelector('#game-over-overlay') as HTMLElement;
 
         this.canvasWidth = this.canvasWrapper.clientWidth;
         this.canvasHeight = this.canvasWrapper.clientHeight;
 
+        // Init Matter
         this.render = Matter.Render.create({
             canvas: this.canvas,
             engine: this.engine,
@@ -54,7 +93,28 @@ export class Game {
         this.init();
     }
 
+    unmount() {
+        if (this.runner) Matter.Runner.stop(this.runner);
+        if (this.render) {
+            Matter.Render.stop(this.render);
+            if (this.render.canvas) this.render.canvas.remove();
+        }
+        if (this.engine) {
+            Matter.World.clear(this.engine.world, false);
+            Matter.Engine.clear(this.engine);
+        }
+        // Remove resize listener
+        window.removeEventListener('resize', this.handleResizeBound);
+    }
+
+    private handleResizeBound = this.handleResize.bind(this);
+
     private init() {
+        preloadImages(() => {
+            // Update UI when images load (for next fruit preview)
+            this.updateUI();
+        });
+
         this.setupPhysics();
         this.setupEvents();
         this.setupInput();
@@ -72,7 +132,7 @@ export class Game {
         Matter.Runner.run(this.runner, this.engine);
         
         // Resize handler
-        window.addEventListener('resize', this.handleResize.bind(this));
+        window.addEventListener('resize', this.handleResizeBound);
     }
 
     private setupPhysics() {
@@ -155,7 +215,13 @@ export class Game {
 
             let clientX;
             if (e.type.startsWith('touch')) {
-                clientX = (e as TouchEvent).touches[0].clientX;
+                // Check if touches array exists and has length
+                const touches = (e as TouchEvent).touches;
+                if (touches && touches.length > 0) {
+                     clientX = touches[0].clientX;
+                } else {
+                     return;
+                }
             } else {
                 clientX = (e as MouseEvent).clientX;
             }
@@ -277,54 +343,16 @@ export class Game {
     }
 
     private handleResize() {
+        if (!this.canvasWrapper) return;
         this.canvasWidth = this.canvasWrapper.clientWidth;
         this.canvasHeight = this.canvasWrapper.clientHeight;
         
-        this.render.canvas.width = this.canvasWidth;
-        this.render.canvas.height = this.canvasHeight;
+        if (this.render && this.render.canvas) {
+            this.render.canvas.width = this.canvasWidth;
+            this.render.canvas.height = this.canvasHeight;
+        }
         
         Matter.World.clear(this.engine.world, true);
         this.setupPhysics();
-        // Note: resizing clears the world, restarting the game effectively or at least removing bodies.
-        // The original code did World.clear(world, true), so it removed static bodies (walls) but kept dynamic ones? 
-        // Wait, 'true' in World.clear means keep static? No, keepStatic is the second arg.
-        // Original: World.clear(world, true); -> keepStatic = true.
-        // So it kept the fruits but removed the walls? 
-        // Then `createWalls()` added new walls.
-        // Ah, World.clear documentation: (world, keepStatic).
-        // If keepStatic is true, it keeps static bodies. Walls ARE static.
-        // So original code: `World.clear(world, true)` -> keeps walls? 
-        // Actually original text: `World.clear(world, true); createWalls();`
-        // If it kept walls, creating walls again would double them.
-        // Let's check Matter.js docs or assume "keepStatic" means "keep non-composite static bodies" or something.
-        // Actually, if I look at original code:
-        /*
-            World.clear(world, true);
-            createWalls();
-        */
-        // If `createWalls` adds new walls, the old ones must be gone or it's a bug.
-        // `createWalls` creates bodies with `isStatic: true`.
-        // If `World.clear(world, true)` keeps static bodies, then old walls remain.
-        // Maybe the user's original code had a bug or logic I missed.
-        // Wait, the original code resize handler:
-        /*
-             World.clear(world, true);
-             createWalls();
-        */
-        // If `keepStatic` is true, then walls (which are static) are kept. Adding new walls implies duplicates. 
-        // However, maybe the intention was to resize walls.
-        // I will follow the logic: Remove everything, then recreate walls, but I want to keep fruits.
-        // Fruits are NOT static.
-        // So I want `World.clear(world, false)` (remove everything) -> lose progress.
-        // OR `remove(walls)`, `add(newWalls)`.
-        // The original code `World.clear(world, true)` suggests it kept "something".
-        // Let's look at `createFruitBody`: `isStatic: isSensor`. Current fruit is static until dropped.
-        // Fallen fruits are not static.
-        // So `World.clear(world, true)` keeps walls AND current fruit?
-        // But then it calls `createWalls()`.
-        
-        // I will improve this: find walls and remove them, then add new ones.
-        // For now I will reproduce the original behavior but maybe `keepStatic: false` if I want to restart or whatever.
-        // Actually, let's just stick to what it did.
     }
 }

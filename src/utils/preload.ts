@@ -10,6 +10,11 @@ export interface TextureData {
 export const textureCache: TextureData[] = [];
 
 export function preloadImages(onLoadUpdate?: () => void) {
+    if (textureCache.length > 0) {
+        if (onLoadUpdate) onLoadUpdate();
+        return;
+    }
+
     FRUIT_LEVELS.forEach((level, index) => {
         const img = new Image();
         const url = IMG_PATH + level.fileName;

@@ -9,44 +9,7 @@
 </head>
 
 <body>
-    <div id="game-container">
-        <div class="header-bar">
-            <div>合成崔梓璇</div>
-            <div class="header-icons">
-                <!-- 新增跳转按钮 -->
-                <a href="2048.html" style="text-decoration: none; margin-right: 8px;">
-                    <button
-                        style="background: #ff69b4; color: white; border: 2px solid #fff; border-radius: 15px; padding: 5px 12px; cursor: pointer; font-size: 14px; font-weight: bold; box-shadow: 0 2px 5px rgba(214, 51, 132, 0.2);">
-                        去玩2048崔梓璇 👉
-                    </button>
-                </a>
-                <a href="whack.html" style="text-decoration: none; margin-right: 8px;">
-                    <button
-                        style="background: #ff69b4; color: white; border: 2px solid #fff; border-radius: 15px; padding: 5px 12px; cursor: pointer; font-size: 14px; font-weight: bold; box-shadow: 0 2px 5px rgba(214, 51, 132, 0.2);">
-                        去玩暴打崔梓璇 👉
-                    </button>
-                </a>
-            </div>
-        </div>
-
-        <div class="game-ui-bar">
-            <div class="score-box"><span id="score">0</span></div>
-            <div class="next-box">
-                <span class="next-label">下一个:</span>
-                <div id="next-item-preview">
-                    <!-- 下一个提示图片将在这里显示 -->
-                </div>
-            </div>
-        </div>
-
-        <div id="canvas-wrapper">
-            <canvas id="world"></canvas>
-            <div id="game-over-overlay">
-                <h2>游戏结束</h2>
-                <button id="restart-btn">再来一次</button>
-            </div>
-        </div>
-    </div>
+    <div id="app" style="display:flex; flex-direction:column; height:100vh; overflow:hidden;"></div>
     <script type="module" src="/src/main.ts"></script>
 </body>
 
