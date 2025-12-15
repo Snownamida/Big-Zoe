@@ -381,9 +381,20 @@ export class GameSynthesis implements GameModule {
         if (this.render && this.render.canvas) {
             this.render.canvas.width = this.canvasWidth;
             this.render.canvas.height = this.canvasHeight;
+            this.render.options.width = this.canvasWidth;
+            this.render.options.height = this.canvasHeight;
         }
+
+        // Remove existing walls
+        const bodies = Matter.Composite.allBodies(this.engine.world);
+        const wallsToRemove = bodies.filter(body => 
+            body.label === 'ground' || 
+            body.label === 'leftWall' || 
+            body.label === 'rightWall'
+        );
+        Matter.World.remove(this.engine.world, wallsToRemove);
         
-        Matter.World.clear(this.engine.world, true);
+        // Add new walls
         this.setupPhysics();
     }
 }

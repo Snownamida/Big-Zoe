@@ -6,6 +6,7 @@ export function createWalls(width: number, height: number): Matter.Body[] {
     
     const ground = Matter.Bodies.rectangle(width / 2, height + wallThickness / 2, width + wallThickness * 2, wallThickness, {
         isStatic: true,
+        label: 'ground',
         render: {
             visible: false
         }
@@ -13,6 +14,7 @@ export function createWalls(width: number, height: number): Matter.Body[] {
 
     const leftWall = Matter.Bodies.rectangle(-wallThickness / 2, height / 2, wallThickness, height * 2, {
         isStatic: true,
+        label: 'leftWall',
         render: {
             visible: false
         }
@@ -20,6 +22,7 @@ export function createWalls(width: number, height: number): Matter.Body[] {
 
     const rightWall = Matter.Bodies.rectangle(width + wallThickness / 2, height / 2, wallThickness, height * 2, {
         isStatic: true,
+        label: 'rightWall',
         render: {
             visible: false
         }
