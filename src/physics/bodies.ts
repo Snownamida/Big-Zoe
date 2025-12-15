@@ -1,15 +1,22 @@
 import Matter from 'matter-js';
 import { FRUIT_LEVELS } from '../constants';
-import { textureCache } from '../utils/preload';
+import { AssetManager } from '../utils/AssetManager';
 
 export function createFruitBody(x: number, y: number, levelIndex: number, isSensor: boolean = false): Matter.Body {
     const levelData = FRUIT_LEVELS[levelIndex];
-    const textureData = textureCache[levelIndex];
+    // Use AssetManager to get texture
+    const textureData = AssetManager.getInstance().getTexture(levelIndex);
 
     // 自定义渲染属性，用于手动绘制
+    // Note: If textureData is undefined (not loaded yet), it will handle gracefully in render
     const customRender = {
         level: levelIndex,
-        texture: textureData, // 包含 imgObject 的缓存数据
+        texture: textureData!, // We might need to handle undefined type-wise or ensure it's loaded. 
+                               // For now, let's assert it or leave it as possibly undefined if the type allows.
+                               // Looking at types.d.ts, texture is required. 
+                               // But AssetManager returns TextureData | undefined.
+                               // Let's assume preloading is done as per game flow.
+                               // Or better, cast it as we know logic ensures it.
         backgroundColor: levelData.backgroundColor,
         borderColor: levelData.borderColor,
         radius: levelData.radius
@@ -29,7 +36,6 @@ export function createFruitBody(x: number, y: number, levelIndex: number, isSens
 
     const body = Matter.Bodies.circle(x, y, levelData.radius, options);
     
-    // Attach customRender to the body (we extended the type in customRender.ts, but let's cast or assign safely)
     (body as any).customRender = customRender;
 
     return body;

@@ -1,18 +1,7 @@
 import Matter from 'matter-js';
-import { TextureData } from '../utils/preload';
 
-// Extend the Matter.Body definition to include our custom property
-declare module 'matter-js' {
-    interface Body {
-        customRender?: {
-            level: number;
-            texture: TextureData;
-            backgroundColor: string;
-            borderColor: string;
-            radius: number;
-        };
-    }
-}
+
+
 
 export function customRenderBodies(render: Matter.Render, engine: Matter.Engine) {
     const context = render.context;
