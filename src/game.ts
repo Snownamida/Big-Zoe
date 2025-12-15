@@ -24,7 +24,10 @@ export class Game {
     private canvasHeight: number = 0;
 
     constructor() {
-        this.engine = Matter.Engine.create();
+        // Increase gravity to make the game feel snappier (default y is 1)
+        this.engine = Matter.Engine.create({
+            gravity: { x: 0, y: 4, scale: 0.001 }
+        });
         this.canvas = document.getElementById('world') as HTMLCanvasElement;
         this.canvasWrapper = document.getElementById('canvas-wrapper') as HTMLElement;
         this.scoreElement = document.getElementById('score') as HTMLElement;
