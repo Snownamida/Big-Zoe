@@ -15,6 +15,7 @@ export class SynthesisUI {
         this.renderInitialHTML();
         this.cacheElements();
         this.bindEvents();
+        this.bindInstallEvents();
     }
 
     private renderInitialHTML() {
@@ -36,6 +37,7 @@ export class SynthesisUI {
                 </div>
                 <div class="header-bar">
                     <div>合成崔梓璇</div>
+                    <button id="install-btn" style="display:none;">安装应用</button>
                 </div>
             </div>
         `;
@@ -53,6 +55,42 @@ export class SynthesisUI {
         if (restartBtn) {
             restartBtn.addEventListener('click', () => {
                 this.restartCallback();
+            });
+        }
+    }
+
+    private bindInstallEvents() {
+        const installBtn = this.container.querySelector('#install-btn') as HTMLElement;
+        let deferredPrompt: any;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent Chrome 67 and earlier from automatically showing the prompt
+            e.preventDefault();
+            // Stash the event so it can be triggered later.
+            deferredPrompt = e;
+            // Update UI to notify the user they can add to home screen
+            if (installBtn) installBtn.style.display = 'block';
+        });
+
+        if (installBtn) {
+            installBtn.addEventListener('click', () => {
+                // hide our user interface that shows our A2HS button
+                installBtn.style.display = 'none';
+                // Show the prompt
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    // Wait for the user to respond to the prompt
+                    deferredPrompt.userChoice.then((choiceResult: any) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('User accepted the A2HS prompt');
+                        } else {
+                            console.log('User dismissed the A2HS prompt');
+                        }
+                        deferredPrompt = null;
+                        // Keep button hidden or allow to reappear if event fires again? 
+                        // Usually event fires once per session until handled.
+                    });
+                }
             });
         }
     }
