@@ -4,7 +4,6 @@ import { Router } from './router/Router';
 import { GameSynthesis } from './games/synthesis/GameSynthesis';
 import { Game2048 } from './games/2048/Game2048';
 import { GameWhack } from './games/whack/GameWhack';
-import { GameAngry } from './games/angry/GameAngry';
 
 document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('app');
@@ -29,6 +28,4 @@ document.addEventListener('DOMContentLoaded', () => {
     router.addRoute('/', () => new GameSynthesis(), 'Synthesis');
     router.addRoute('/2048', () => new Game2048(), '2048');
     router.addRoute('/whack', () => new GameWhack(), 'Whack');
-    router.addRoute('/angry', () => new GameAngry(), 'Angry');
 });
-
