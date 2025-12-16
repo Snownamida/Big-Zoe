@@ -91,7 +91,7 @@ export class GameNinja implements GameModule {
                  this.handleMissedFruit();
             }
             // Remove debris that fell out
-            if (body.label === 'debris' && body.position.y > this.canvasHeight + 100) {
+            if (body.label === 'fruit_debris' && body.position.y > this.canvasHeight + 100) {
                  Matter.World.remove(this.engine.world, body);
             }
         }
@@ -127,22 +127,45 @@ export class GameNinja implements GameModule {
         const { position, velocity } = originalBody;
         const level = parseInt(originalBody.label.split('_')[1] || '0');
         
-        // Spawn 2 smaller pieces
+        // Calculate slice angle from velocity difference or random perpendicular to velocity?
+        // Actually we want the slice to look like the cut.
+        // But we don't have the cut trail vector here easily without passing it.
+        // Let's assume the slice is perpendicular to the fruit's velocity (as if it hit a blade)
+        // OR better: use the slice system's last cut angle if we could.
+        // For simplicity, let's just make it random or based on fruit velocity.
+        // If we want it to look like THE cut, we need the cut angle.
+        // Let's just pick a random angle for now to show the effect, or assume a horizontal cut if falling/vertical if moving side.
+        // Let's use a random angle for the cut.
+        const cutAngle = Math.random() * Math.PI * 2;
+        
+        // Spawn 2 halves
         for (let i = 0; i < 2; i++) {
-            // We use createFruitBody but make them sensors and maybe smaller?
-            // Actually createFruitBody takes fixed sizes based on level.
-            // Let's just use same level but set them as sensors so they don't block
-            // And maybe a different label so they are not sliceable
             const debris = createFruitBody(position.x, position.y, level, true);
-            debris.label = 'debris';
+            debris.label = 'fruit_debris';
+            Matter.Body.setStatic(debris, false); // Ensure it moves
             
-            // Give them some velocity apart
-            const speed = Math.hypot(velocity.x, velocity.y);
-            const angle = Math.atan2(velocity.y, velocity.x) + (i === 0 ? 0.5 : -0.5);
+            // Set slice property
+            // Half 1: cutAngle to cutAngle + PI
+            // Half 2: cutAngle + PI to cutAngle + 2PI
+            const startAngle = cutAngle + (i * Math.PI);
+            const endAngle = startAngle + Math.PI;
+            
+            // We need to ensure customRender exists. createFruitBody attaches it.
+            if (debris.customRender) {
+                debris.customRender.slice = {
+                    startAngle: startAngle, 
+                    endAngle: endAngle
+                };
+            }
+            
+            // Push them apart perpendicular to the cut
+            // Normal vector for half 1 is roughly at cutAngle + PI/2
+            const pushAngle = cutAngle + Math.PI/2 + (i === 1 ? Math.PI : 0);
+            const pushSpeed = 5;
             
             Matter.Body.setVelocity(debris, {
-                x: Math.cos(angle) * (speed + 2),
-                y: Math.sin(angle) * (speed + 2)
+                x: velocity.x + Math.cos(pushAngle) * pushSpeed,
+                y: velocity.y + Math.sin(pushAngle) * pushSpeed
             });
             Matter.Body.setAngularVelocity(debris, (Math.random() - 0.5) * 0.5);
 

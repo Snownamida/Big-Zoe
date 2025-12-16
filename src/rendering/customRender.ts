@@ -26,7 +26,8 @@ export function customRenderBodies(render: Matter.Render, engine: Matter.Engine)
             texture,
             backgroundColor,
             borderColor,
-            radius
+            radius,
+            slice // { startAngle: number, endAngle: number }
         } = customRender;
 
         // 1. 保存当前 Canvas 状态
@@ -40,7 +41,13 @@ export function customRenderBodies(render: Matter.Render, engine: Matter.Engine)
 
         // 3. 绘制圆形路径 (用于填充和描边)
         context.beginPath();
-        context.arc(0, 0, radius, 0, 2 * Math.PI);
+        if (slice) {
+            const { startAngle, endAngle } = slice;
+            context.arc(0, 0, radius, startAngle, endAngle);
+            context.closePath(); // Connects the chord
+        } else {
+            context.arc(0, 0, radius, 0, 2 * Math.PI);
+        }
 
         // 4. 填充背景色
         context.fillStyle = backgroundColor;

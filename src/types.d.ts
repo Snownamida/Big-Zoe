@@ -9,6 +9,10 @@ declare module 'matter-js' {
             backgroundColor: string;
             borderColor: string;
             radius: number;
+            slice?: {
+                startAngle: number;
+                endAngle: number;
+            };
         };
         // Add other properties that we were casting to 'any'.
         isStuck?: boolean;
