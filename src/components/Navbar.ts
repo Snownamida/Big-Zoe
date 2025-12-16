@@ -20,7 +20,7 @@ export class Navbar {
             { name: '合成版', path: '/' },
             { name: '2048版', path: '/2048' },
             { name: '暴打版', path: '/whack' },
-
+            { name: '忍者版', path: '/ninja' },
         ];
 
         links.forEach(link => {
