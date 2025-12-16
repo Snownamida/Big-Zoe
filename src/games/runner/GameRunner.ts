@@ -2,6 +2,7 @@ import { GameModule } from '../../router/types';
 import { RunnerUI } from './RunnerUI';
 import { Player } from './Player';
 import { LevelManager } from './LevelManager';
+import { AssetManager } from '../../utils/AssetManager';
 
 export class GameRunner implements GameModule {
     private ui!: RunnerUI;
@@ -27,6 +28,11 @@ export class GameRunner implements GameModule {
         container.addEventListener('mousedown', this.boundHandleInput);
         window.addEventListener('resize', this.handleResize);
 
+        window.addEventListener('resize', this.handleResize);
+
+        // Preload assets
+        AssetManager.getInstance().preloadImages();
+        
         this.initGame();
         this.startGameLoop();
     }

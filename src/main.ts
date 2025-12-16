@@ -6,6 +6,7 @@ import { Game2048 } from './games/2048/Game2048';
 import { GameWhack } from './games/whack/GameWhack';
 import { GameNinja } from './games/ninja/GameNinja';
 import { GameRunner } from './games/runner/GameRunner';
+import { GameBird } from './games/bird/GameBird';
 
 document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('app');
@@ -32,4 +33,5 @@ document.addEventListener('DOMContentLoaded', () => {
     router.addRoute('/whack', () => new GameWhack(), 'Whack');
     router.addRoute('/ninja', () => new GameNinja(), 'Ninja');
     router.addRoute('/runner', () => new GameRunner(), 'Runner');
+    router.addRoute('/bird', () => new GameBird(), 'Bird');
 });
