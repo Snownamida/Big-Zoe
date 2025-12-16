@@ -4,7 +4,7 @@ export class NinjaUI {
     private canvas: HTMLCanvasElement;
     private scoreElement: HTMLElement;
     private gameOverElement: HTMLElement;
-    private score: number = 0;
+    // private score: number = 0; // Removed unused property
     
     constructor(container: HTMLElement, onRestart: () => void) {
         this.container = container;
@@ -82,7 +82,7 @@ export class NinjaUI {
     getCanvasWrapper() { return this.canvasWrapper; }
 
     updateScore(score: number) {
-        this.score = score;
+        // this.score = score; // Not storing it for now as it's not used internally
         this.scoreElement.innerText = score.toString();
     }
 
