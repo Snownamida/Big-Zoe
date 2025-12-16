@@ -5,6 +5,7 @@ import { GameSynthesis } from './games/synthesis/GameSynthesis';
 import { Game2048 } from './games/2048/Game2048';
 import { GameWhack } from './games/whack/GameWhack';
 import { GameNinja } from './games/ninja/GameNinja';
+import { GameRunner } from './games/runner/GameRunner';
 
 document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('app');
@@ -30,4 +31,5 @@ document.addEventListener('DOMContentLoaded', () => {
     router.addRoute('/2048', () => new Game2048(), '2048');
     router.addRoute('/whack', () => new GameWhack(), 'Whack');
     router.addRoute('/ninja', () => new GameNinja(), 'Ninja');
+    router.addRoute('/runner', () => new GameRunner(), 'Runner');
 });

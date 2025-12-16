@@ -21,6 +21,7 @@ export class Navbar {
             { name: '2048版', path: '/2048' },
             { name: '暴打版', path: '/whack' },
             { name: '忍者版', path: '/ninja' },
+            { name: '酷跑版', path: '/runner' },
         ];
 
         links.forEach(link => {
