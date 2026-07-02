@@ -23,6 +23,7 @@ export class Navbar {
             { name: '忍者版', path: '/ninja' },
             { name: '酷跑版', path: '/runner' },
             { name: '飞飞版', path: '/bird' },
+            { name: '愤怒版', path: '/angry' },
         ];
 
         links.forEach(link => {
