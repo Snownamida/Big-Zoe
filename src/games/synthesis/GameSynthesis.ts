@@ -7,6 +7,7 @@ import { GameModule } from '../../router/types';
 import { SynthesisUI } from './UI';
 import { InputHandler } from './Input';
 import { AssetManager } from '../../utils/AssetManager';
+import { loadBest, saveBest } from '../../utils/bestScore';
 
 export class GameSynthesis implements GameModule {
     private engine!: Matter.Engine;
@@ -168,8 +169,9 @@ export class GameSynthesis implements GameModule {
         const bodies = Matter.Composite.allBodies(this.engine.world);
         for (const body of bodies) {
             if (body.label.startsWith('fruit_') && !body.isSensor) {
-                // Check if stuck near top
-                if (body.position.y < 80 && body.speed < 0.2 && body.position.y > 70) {
+                // 游戏结束：任何已落下的水果静止在警戒线 (y<80) 以上。
+                // 注意：不能加 y>70 下限，否则堆得更高反而永远不判负。
+                if (body.position.y < 80 && body.speed < 0.2) {
                      if (!body.isStuck) {
                         body.isStuck = true;
                         body.stuckTimer = Date.now();
@@ -208,7 +210,7 @@ export class GameSynthesis implements GameModule {
         this.currentFruit.isSensor = false; // Enable collisions
         this.currentFruit = null;
 
-        setTimeout(() => this.spawnCurrentFruit(), 600);
+        setTimeout(() => this.spawnCurrentFruit(), 400); // 稍短的冷却，连招更跟手
     }
 
     private getRandomNextLevel(): number {
@@ -240,13 +242,16 @@ export class GameSynthesis implements GameModule {
 
     private setGameOver() {
         this.isGameOver = true;
-        this.ui.showGameOver();
+        const prevBest = loadBest('synthesis');
+        const best = saveBest('synthesis', this.score);
+        this.ui.showGameOver(this.score, best, this.score > prevBest && this.score > 0);
         if (this.currentFruit) Matter.World.remove(this.engine.world, this.currentFruit);
     }
 
     private restartGame() {
         Matter.Runner.stop(this.runner);
-        Matter.World.clear(this.engine.world, true); // Create from scratch
+        // false = 连静态物体（墙）一起清空，避免每次重开叠加一套重复的墙
+        Matter.World.clear(this.engine.world, false);
         Matter.Engine.clear(this.engine);
 
         this.score = 0;
@@ -271,10 +276,11 @@ export class GameSynthesis implements GameModule {
         this.canvasHeight = wrapper.clientHeight;
         
         if (this.render && this.render.canvas) {
-            this.render.canvas.width = this.canvasWidth;
-            this.render.canvas.height = this.canvasHeight;
-            this.render.options.width = this.canvasWidth;
-            this.render.options.height = this.canvasHeight;
+            // setSize 会正确处理 devicePixelRatio（手动改 canvas.width 会绕过
+            // pixelRatio 缩放，导致高分屏旋转/缩放后画面模糊或比例错乱）。
+            // 运行时存在于 matter-js 0.19+，但 @types/matter-js 尚未收录。
+            (Matter.Render as unknown as { setSize(r: Matter.Render, w: number, h: number): void })
+                .setSize(this.render, this.canvasWidth, this.canvasHeight);
         }
 
         // Remove existing walls

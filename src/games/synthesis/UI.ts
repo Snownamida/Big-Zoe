@@ -32,6 +32,7 @@ export class SynthesisUI {
                     <canvas id="world"></canvas>
                     <div id="game-over-overlay">
                         <h2>游戏结束</h2>
+                        <p id="final-score" style="margin:4px 0 12px;font-size:1.05rem;"></p>
                         <button id="restart-btn">再来一次</button>
                     </div>
                 </div>
@@ -134,7 +135,13 @@ export class SynthesisUI {
         }
     }
 
-    public showGameOver() {
+    public showGameOver(score?: number, best?: number, isRecord?: boolean) {
+        const el = this.gameOverOverlay.querySelector('#final-score') as HTMLElement | null;
+        if (el && score !== undefined) {
+            el.textContent = isRecord
+                ? `🎉 新纪录：${score} 分！`
+                : `得分 ${score} · 最高 ${best ?? score}`;
+        }
         this.gameOverOverlay.style.display = 'flex';
     }
 
